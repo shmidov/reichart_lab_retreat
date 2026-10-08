@@ -396,6 +396,13 @@ function setup() {
   }
   getOrCreateSheet_(RESPONSES_SHEET, RESPONSE_HEADERS);
   getOrCreateSheet_(SUMMARY_SHEET, SUMMARY_HEADERS);
+  console.log('The game tabs are ready in "' + ss.getName() + '": ' + ss.getUrl());
+}
+
+/** Run from the editor to see which spreadsheet this script writes to. */
+function showSheetUrl() {
+  const ss = getSpreadsheet_();
+  console.log('This script uses "' + ss.getName() + '": ' + ss.getUrl());
 }
 
 /** Resets the live game (state, players, live answers). Responses and Summary sheets are kept. */

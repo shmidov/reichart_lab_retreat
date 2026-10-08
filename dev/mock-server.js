@@ -52,6 +52,8 @@ class FakeSheet {
 
 const sheets = new Map();
 const spreadsheet = {
+  getName: () => 'Mock spreadsheet',
+  getUrl: () => `http://localhost:${PORT}/mock/sheets`,
   getSheetByName: name => sheets.get(name) || null,
   insertSheet: name => { const s = new FakeSheet(name); sheets.set(name, s); return s; },
 };
