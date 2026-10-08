@@ -84,6 +84,7 @@
     let password = sessionStorage.getItem('hostPassword') || '';
     let state = null;
     let questions = [];
+    let questionsError = null;
     let busy = false;
 
     const TYPE_LABELS = { scale: 'סולם', yesno: 'כן / לא', choice: 'בחירה' };
@@ -120,8 +121,9 @@
       sessionStorage.setItem('hostPassword', password);
       $('login-wrap').hidden = true;
       $('panel').hidden = false;
-      await loadQuestions();
       apply(s);
+      await loadQuestions();
+      render();
       startPolling(async () => {
         if (busy) return;
         const s = await hostApi('host');
@@ -129,8 +131,14 @@
       }, err => { if (!busy) setStatus(err); }, POLL_GAP_MS.host);
     }
 
+    /** Errors are kept and shown in the question list (the status line is cleared by every poll). */
     async function loadQuestions() {
-      questions = await hostApi('questions');
+      try {
+        questions = await hostApi('questions');
+        questionsError = null;
+      } catch (err) {
+        questionsError = err;
+      }
     }
 
     // ---------- actions ----------
@@ -179,13 +187,8 @@
     $('clear-players').addEventListener('click', () =>
       act('clearPlayers', null, 'לנקות את רשימת המשתתפים? (משתתפים מחוברים יופיעו שוב בפעם הבאה שירעננו)'));
     $('reload-questions').addEventListener('click', async () => {
-      try {
-        await loadQuestions();
-        render();
-        setStatus(null);
-      } catch (err) {
-        setStatus(err);
-      }
+      await loadQuestions();
+      render();
     });
 
     // ---------- rendering ----------
@@ -250,6 +253,11 @@
         : [el('span', { class: 'muted' }, 'עוד אין משתתפים.')]));
 
       // Question list
+      if (questionsError) {
+        $('qlist').replaceChildren(el('li', { class: 'status error', style: 'text-align:start' },
+          'טעינת השאלות מהגיליון נכשלה: ' + questionsError.message));
+        return;
+      }
       $('qlist').replaceChildren(...questions.map((q, i) => {
         const isCurrent = i === s.index && (s.phase === 'open' || s.phase === 'results');
         return el('li', { class: isCurrent ? 'current' : '' },
