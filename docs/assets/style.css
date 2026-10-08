@@ -184,3 +184,10 @@ body.screen { font-size: clamp(16px, 1.6vw, 28px); }
 .join-url { direction: ltr; font-size: .8em; color: var(--muted); margin-top: 12px; overflow-wrap: anywhere; }
 .corner-qr { position: fixed; bottom: 3vh; left: 3vw; text-align: center; font-size: .6em; color: var(--muted); }
 .corner-qr .qr-box { padding: 8px; border-radius: 10px; }
+
+/* ---------- connection status ---------- */
+
+.pill.good { background: var(--ok-soft); border-color: transparent; color: var(--ok); }
+.pill.bad { background: #fdecec; border-color: transparent; color: var(--danger); }
+.screen-status { display: flex; gap: 12px; align-items: center; font-size: .75em; color: var(--muted); }
+.screen-status .status { min-height: 0; }

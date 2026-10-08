@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-// Local rehearsal server: runs apps-script/Code.gs against in-memory fakes of the
-// Google services, and serves the site from docs/ with API_URL pointed at it.
+// Local rehearsal server: serves the site from docs/ and fakes the Google Sheet backend by running
+// apps-script/Code.gs against in-memory fakes of the Google services. Live messages still go through
+// the real public relays, under a random dev game id, so they never mix with the real game.
 //
 //   node dev/mock-server.js            -> http://localhost:8080  (host password: "host")
-//   PORT=9000 HOST_PASSWORD=x node dev/mock-server.js
+//   PORT=9000 API_DELAY_MS=0 node dev/mock-server.js
 //
 // GET /mock/sheets shows the fake spreadsheet contents.
 
@@ -16,6 +17,8 @@ const ROOT = path.resolve(__dirname, '..');
 const SITE = path.join(ROOT, 'docs');
 const PORT = Number(process.env.PORT || 8080);
 const HOST_PASSWORD = process.env.HOST_PASSWORD || 'host';
+const GAME_ID = 'dev-' + Math.random().toString(36).slice(2, 10);
+const API_DELAY_MS = Number(process.env.API_DELAY_MS ?? 1200); // Apps Script is about this slow
 
 // ---------- fake Google services ----------
 
@@ -46,6 +49,7 @@ class FakeSheet {
       },
     };
   }
+  setName(name) { sheets.delete(this.name); this.name = name; sheets.set(name, this); return this; }
   clearContents() { this.rows = []; }
   setFrozenRows() {}
 }
@@ -58,7 +62,7 @@ const spreadsheet = {
   insertSheet: name => { const s = new FakeSheet(name); sheets.set(name, s); return s; },
 };
 
-const props = new Map([['HOST_PASSWORD', HOST_PASSWORD]]);
+const props = new Map();
 const properties = {
   getProperty: k => (props.has(k) ? props.get(k) : null),
   setProperty: (k, v) => { props.set(k, String(v)); return properties; },
@@ -66,18 +70,10 @@ const properties = {
   getProperties: () => Object.fromEntries(props),
 };
 
-const cache = new Map();
-const scriptCache = {
-  get: k => (cache.has(k) ? cache.get(k) : null),
-  put: (k, v) => { cache.set(k, v); },
-  remove: k => { cache.delete(k); },
-};
-
 const context = vm.createContext({
   console,
   SpreadsheetApp: { getActive: () => spreadsheet },
   PropertiesService: { getScriptProperties: () => properties },
-  CacheService: { getScriptCache: () => scriptCache },
   LockService: { getScriptLock: () => ({ waitLock() {}, releaseLock() {} }) },
   ContentService: {
     MimeType: { JSON: 'application/json' },
@@ -99,17 +95,18 @@ http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
 
   if (url.pathname === '/api') {
-    if (req.method === 'GET') {
-      return send(res, 200, 'application/json', context.doGet({ parameter: Object.fromEntries(url.searchParams) }).content);
-    }
+    const reply = out => setTimeout(() => send(res, 200, 'application/json', out.content), API_DELAY_MS);
+    if (req.method === 'GET') return reply(context.doGet({ parameter: Object.fromEntries(url.searchParams) }));
     let body = '';
     req.on('data', chunk => { body += chunk; });
-    req.on('end', () => send(res, 200, 'application/json', context.doPost({ postData: { contents: body } }).content));
+    req.on('end', () => reply(context.doPost({ postData: { contents: body } })));
     return;
   }
 
   if (url.pathname === '/config.js') {
-    return send(res, 200, TYPES['.js'], "window.APP_CONFIG = { API_URL: '/api' };\n");
+    const real = fs.readFileSync(path.join(SITE, 'config.js'), 'utf8');
+    const override = { API_URL: '/api', GAME_ID, HOST_PASSWORD };
+    return send(res, 200, TYPES['.js'], real + `\nObject.assign(window.APP_CONFIG, ${JSON.stringify(override)});\n`);
   }
 
   if (url.pathname === '/mock/sheets') {
@@ -131,4 +128,5 @@ http.createServer((req, res) => {
   console.log(`  host:    http://localhost:${PORT}/host.html   (password: ${HOST_PASSWORD})`);
   console.log(`  screen:  http://localhost:${PORT}/screen.html`);
   console.log(`  sheets:  http://localhost:${PORT}/mock/sheets`);
+  console.log(`  game id: ${GAME_ID}   (bots: node dev/bots.js http://localhost:${PORT} 20)`);
 });

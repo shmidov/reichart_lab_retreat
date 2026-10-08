@@ -1,8 +1,6 @@
 // Shared helpers for the player, host and screen pages.
 
-// Each Apps Script call already takes ~1s, so these are only the pauses *between* calls.
-const POLL_GAP_MS = { player: 700, host: 300, screen: 200 };
-
+/** Calls the Apps Script backend (Google Sheet). Only the projector screen uses this. */
 async function api(action, payload) {
   const url = (window.APP_CONFIG || {}).API_URL || '';
   if (!url || url.indexOf('PASTE_') === 0) throw new Error('יש להגדיר את API_URL בקובץ config.js');
@@ -15,34 +13,6 @@ async function api(action, payload) {
   const json = await res.json();
   if (!json.ok) throw new Error(json.error || 'שגיאה לא ידועה');
   return json.data;
-}
-
-/**
- * Calls fn repeatedly, pausing gapMs (plus jitter) after each call finishes. onStatus(err|null) after each call.
- * Polls right away when the tab becomes visible again (e.g. a phone waking up).
- */
-function startPolling(fn, onStatus, gapMs) {
-  let stopped = false;
-  let running = false;
-  let timer = null;
-  async function tick() {
-    clearTimeout(timer);
-    if (running || stopped) return;
-    running = true;
-    try {
-      await fn();
-      if (onStatus) onStatus(null);
-    } catch (err) {
-      if (onStatus) onStatus(err);
-    }
-    running = false;
-    if (!stopped) timer = setTimeout(tick, gapMs + Math.random() * 300);
-  }
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') tick();
-  });
-  tick();
-  return () => { stopped = true; clearTimeout(timer); };
 }
 
 /** Tiny DOM builder: el('div', {class: 'x', onclick: fn}, 'text', childNode). Text is never parsed as HTML. */
@@ -88,9 +58,10 @@ function renderBars(container, results, type) {
         el('div', { class: 'bar-label' }, c.label));
     }));
   container.replaceChildren(chart);
-  requestAnimationFrame(() => requestAnimationFrame(() => {
-    bars.forEach(([bar, frac]) => { bar.style.height = (frac * 100) + '%'; });
-  }));
+  // Force a layout at height 0, then set the real heights so they animate. (Not requestAnimationFrame:
+  // it doesn't run while the tab is in the background, which would leave the bars at 0.)
+  void chart.offsetHeight;
+  bars.forEach(([bar, frac]) => { bar.style.height = (frac * 100) + '%'; });
 }
 
 function playerUrl() {

@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body>
   <main class="wrap">
@@ -33,25 +34,58 @@
 
   <script src="config.js"></script>
   <script src="assets/common.js"></script>
+  <script src="assets/relay.js"></script>
   <script>
-    let playerId = storage.get('playerId');
-    if (!playerId) {
-      playerId = window.crypto && crypto.randomUUID
-        ? crypto.randomUUID()
-        : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
-      storage.set('playerId', playerId);
-    }
-    let name = storage.get('name');
-    let state = null;
-    let stopPolling = null;
-
     const $ = id => document.getElementById(id);
     const view = $('view');
+    const SAVED_NOTE = 'נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה';
 
-    function setStatus(err) {
-      $('status').textContent = err ? err.message : '';
-      $('status').className = 'status' + (err ? ' error' : '');
+    let playerId = storage.get('playerId');
+    if (!playerId) { playerId = randomId(); storage.set('playerId', playerId); }
+    let name = storage.get('name');
+    let state = null;
+
+    const relay = new Relay(connected => {
+      $('status').textContent = connected ? '' : 'אין חיבור, מנסה שוב…';
+      $('status').className = 'status' + (connected ? '' : ' error');
+      if (connected && name) sendJoin(); // (re)announce ourselves after every reconnect
+    });
+
+    relay.subscribe('state', s => {
+      if (!isNewerState(s, state)) return;
+      const changed = !state || s.phase !== state.phase || s.round !== state.round || s.epoch !== state.epoch;
+      state = s;
+      if (changed) render();
+    });
+
+    // Acknowledgements for this player only.
+    relay.subscribe('p/' + playerId, msg => {
+      if (msg.type === 'welcome') {
+        // The server remembers our answer (e.g. after a reload or on another tab).
+        if (msg.answer && state && msg.round === state.round) {
+          storage.set(answerKey(msg.round), msg.answer);
+          if (state.phase === 'open') { markSelected(msg.answer); setNote(SAVED_NOTE, 'ok'); }
+        }
+        return;
+      }
+      if (!pending || msg.round !== pending.round || msg.answer !== pending.answer) return;
+      clearTimeout(pending.timer);
+      pending = null;
+      if (msg.type === 'ack') {
+        setNote(SAVED_NOTE, 'ok');
+      } else {
+        storage.remove(answerKey(msg.round));
+        markSelected(null);
+        setNote(msg.error || 'השמירה נכשלה', 'error');
+      }
+    });
+
+    // ---------- joining ----------
+
+    function sendJoin() {
+      relay.publish('in', { type: 'join', id: playerId, name });
     }
+    setInterval(() => { if (name) sendJoin(); }, 20000); // presence, so a restarted screen re-learns everyone
 
     function showJoin() {
       $('game').hidden = true;
@@ -60,75 +94,56 @@
       $('name-input').focus();
     }
 
-    async function join(newName) {
-      const data = await api('join', { playerId, name: newName });
-      name = newName;
-      storage.set('name', name);
+    function enterGame() {
       $('me').textContent = name;
       $('join').hidden = true;
       $('game').hidden = false;
-      applyState(data, true);
-      if (!stopPolling) {
-        stopPolling = startPolling(async () => applyState(await api('state')), setStatus, POLL_GAP_MS.player);
-      }
+      sendJoin();
+      render();
     }
 
-    $('join-form').addEventListener('submit', async e => {
+    $('join-form').addEventListener('submit', e => {
       e.preventDefault();
-      const value = $('name-input').value.trim();
+      const value = $('name-input').value.trim().replace(/\s+/g, ' ');
       if (!value) return;
-      const btn = e.submitter || $('join-form').querySelector('button');
-      btn.disabled = true;
-      try {
-        await join(value);
-        setStatus(null);
-      } catch (err) {
-        setStatus(err);
-      } finally {
-        btn.disabled = false;
-      }
+      name = value;
+      storage.set('name', name);
+      enterGame();
     });
 
     $('rename').addEventListener('click', showJoin);
 
-    function applyState(next, force) {
-      if (!force && state && next.rev === state.rev) return;
-      state = next;
-      render();
-    }
-
     // ---------- answering ----------
 
-    const answerKey = round => 'answer:' + round;
-    let sending = false;
-    let pending = null;
+    const answerKey = round => 'answer:' + round + ':' + (state && state.question ? state.question.id : '');
+    let pending = null; // {round, answer, tries, timer}: waiting for the screen to acknowledge
 
-    async function choose(option) {
+    function choose(answer) {
       const round = state.round;
-      storage.set(answerKey(round), option);
-      markSelected(option);
-      pending = { round, option };
-      if (sending) return;
-      sending = true;
-      setNote('שומר…');
-      while (pending) {
-        const p = pending;
-        pending = null;
-        try {
-          await api('answer', { playerId, name, round: p.round, answer: p.option });
-          if (!pending) setNote('נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה', 'ok');
-        } catch (err) {
-          if (storage.get(answerKey(p.round)) === p.option) storage.remove(answerKey(p.round));
-          if (!pending) { markSelected(null); setNote(err.message, 'error'); }
-        }
-      }
-      sending = false;
+      storage.set(answerKey(round), answer);
+      markSelected(answer);
+      if (pending) clearTimeout(pending.timer);
+      pending = { round, answer, tries: 0 };
+      sendAnswer();
     }
 
-    function markSelected(option) {
+    function sendAnswer() {
+      if (!pending) return;
+      if (pending.tries >= 6) {
+        setNote('המסך הראשי לא עונה. נסו לבחור שוב.', 'error');
+        pending = null;
+        return;
+      }
+      pending.tries++;
+      setNote('שומר…');
+      relay.publish('in', { type: 'answer', id: playerId, name, round: pending.round, answer: pending.answer });
+      pending.timer = setTimeout(sendAnswer, 2500);
+    }
+
+    function markSelected(answer) {
       view.querySelectorAll('.option').forEach(b => {
-        b.classList.toggle('selected', b.dataset.value === option);
-        b.setAttribute('aria-pressed', b.dataset.value === option ? 'true' : 'false');
+        b.classList.toggle('selected', b.dataset.value === answer);
+        b.setAttribute('aria-pressed', b.dataset.value === answer ? 'true' : 'false');
       });
     }
 
@@ -142,10 +157,16 @@
     // ---------- rendering ----------
 
     function render() {
+      if ($('game').hidden) return;
       const s = state;
-      if (s.phase === 'open' && s.question) return renderQuestion(s);
+      if (pending && (!s || s.phase !== 'open' || s.round !== pending.round)) {
+        clearTimeout(pending.timer);
+        pending = null;
+      }
 
-      if (s.phase === 'results' && s.question) {
+      if (s && s.phase === 'open' && s.question) return renderQuestion(s);
+
+      if (s && s.phase === 'results' && s.question) {
         const mine = storage.get(answerKey(s.round));
         view.replaceChildren(
           el('div', { class: 'counter' }, questionCounter(s)),
@@ -157,7 +178,7 @@
         return;
       }
 
-      if (s.phase === 'end') {
+      if (s && s.phase === 'end') {
         view.replaceChildren(el('div', { class: 'center' },
           el('div', { class: 'emoji' }, '🎉'),
           el('h2', {}, 'תודה שהשתתפתם!')));
@@ -186,17 +207,13 @@
             'aria-pressed': opt === selected ? 'true' : 'false',
             onclick: () => choose(opt),
           }, opt))),
-        el('div', { class: 'note' }, selected ? 'נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה' : 'בחרו תשובה'));
-      if (selected) setNote('נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה', 'ok');
+        el('div', { class: 'note' + (selected ? ' ok' : '') }, selected ? SAVED_NOTE : 'בחרו תשובה'));
     }
 
     // ---------- start ----------
 
-    if (name) {
-      join(name).catch(err => { setStatus(err); showJoin(); });
-    } else {
-      showJoin();
-    }
+    if (name) enterGame();
+    else showJoin();
   </script>
 </body>
 </html>

@@ -8,15 +8,22 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="screen">
   <div class="stage">
     <div class="brand">
       <span>ריטריט מעבדת רייכרט</span>
-      <span id="status" class="status" style="min-height:0"></span>
+      <span class="screen-status">
+        <span id="conn"></span>
+        <span id="role"></span>
+        <button class="link" id="takeover" type="button" hidden>להפוך למסך הראשי</button>
+      </span>
     </div>
-    <div class="stage-body" id="body"></div>
+    <div class="stage-body" id="body">
+      <div class="center muted"><span class="dots">מתחבר</span></div>
+    </div>
   </div>
   <div class="corner-qr" id="corner-qr" hidden>
     <div class="qr-box" id="corner-qr-code"></div>
@@ -25,30 +32,120 @@
 
   <script src="config.js"></script>
   <script src="assets/common.js"></script>
+  <script src="assets/relay.js"></script>
+  <script src="assets/game-server.js"></script>
   <script>
+    // This page is the game's "server": the first projector screen to open runs the game in memory.
+    // Any other copy of this page just mirrors it (and can take over, e.g. if the projector laptop changes).
     const $ = id => document.getElementById(id);
     const body = $('body');
     const joinUrl = playerUrl();
+
+    // Per tab (survives reloads, but a second tab is a different screen). The game memory itself is per browser.
+    let serverId = null;
+    try { serverId = sessionStorage.getItem('serverId'); } catch (err) { /* storage blocked */ }
+    if (!serverId) {
+      serverId = randomId();
+      try { sessionStorage.setItem('serverId', serverId); } catch (err) { /* storage blocked */ }
+    }
+
+    let mode = 'starting'; // 'server' | 'viewer'
+    let server = null;
     let state = null;
+    let lastState = null; // latest state seen on the relay (to adopt on takeover)
+    let lastHost = null;
+    let heartbeat = null; // latest heartbeat seen from any server
+    let heartbeatAt = 0;
+
+    const relay = new Relay((connected, total) => {
+      $('conn').textContent = connected ? '' : 'אין חיבור לשרת ההודעות, מנסה שוב…';
+      $('conn').className = connected ? '' : 'status error';
+    });
+
+    let otherBeats = 0; // live heartbeats from another screen since this page loaded
+
+    relay.subscribe('server', hb => {
+      heartbeat = hb;
+      heartbeatAt = Date.now();
+      if (hb.serverId !== serverId) otherBeats++;
+      // Someone took over with a newer claim: step down.
+      if (mode === 'server' && hb.serverId !== serverId && hb.epoch > server.g.epoch) becomeViewer();
+    });
+    relay.subscribe('state', s => {
+      if (isNewerState(s, lastState)) lastState = s;
+      if (mode === 'viewer' && isNewerState(s, state)) { state = s; render(); }
+    });
+    relay.subscribe('host', h => {
+      if (isNewerState(h, lastHost)) lastHost = h;
+    });
 
     renderQr($('corner-qr-code'), joinUrl, 110);
 
-    function apply(next) {
-      const changed = !state || next.rev !== state.rev;
-      state = next;
-      if (changed) render();
-      updateCounts();
+    (async function start() {
+      await relay.whenConnected(15000);
+      await new Promise(r => setTimeout(r, 2500)); // collect retained heartbeat/state
+      const otherAlive = heartbeat && heartbeat.serverId !== serverId && Date.now() - heartbeat.t < SERVER_ALIVE_MS + 5000;
+      if (otherAlive) becomeViewer();
+      else becomeServer(false);
+    })();
+
+    function nextEpoch() {
+      const seen = Math.max(lastState ? lastState.epoch : 0, heartbeat ? heartbeat.epoch : 0);
+      return Math.max(Date.now(), seen + 1);
     }
 
-    function updateCounts() {
-      const players = document.querySelector('[data-count=players]');
-      if (players) players.textContent = state.playerCount;
-      const answered = document.querySelector('[data-count=answered]');
-      if (answered) answered.textContent = state.answeredCount;
+    function becomeServer(takeover) {
+      mode = 'server';
+      server = new GameServer(relay, serverId, nextEpoch(), (s) => { state = s; render(); });
+      // Continue from what was last published, unless this browser's own memory is that same (or a later) game.
+      if (lastState && (takeover || lastState.epoch > server.savedEpoch)) {
+        server.adopt(lastState, lastHost);
+      }
+      server.start();
+      $('role').textContent = '';
+      $('takeover').hidden = true;
     }
+
+    function becomeViewer() {
+      if (server) { server.stop(); server = null; }
+      mode = 'viewer';
+      $('role').textContent = 'מסך משני (המשחק רץ על מסך אחר)';
+      $('takeover').hidden = false;
+      if (lastState) { state = lastState; render(); }
+    }
+
+    $('takeover').addEventListener('click', () => {
+      if (confirm('להעביר את המשחק למסך הזה? (תשובות שעוד לא נסגרו בשאלה הפתוחה יאבדו)')) becomeServer(true);
+    });
+
+    // The "other screen" only ever sent its last (retained) heartbeat: it's gone, so take over automatically.
+    // If a live main screen disappears, only offer the takeover button (it may just be reconnecting).
+    setInterval(() => {
+      if (mode !== 'viewer' || Date.now() - heartbeatAt < SERVER_ALIVE_MS) return;
+      if (otherBeats <= 1) becomeServer(false);
+      else $('role').textContent = 'המסך הראשי לא מחובר';
+    }, 2000);
+
+    // ---------- rendering ----------
+
+    let renderedKey = null;
 
     function render() {
+      if (!state) return;
       const s = state;
+      // Only rebuild the page when something visible changed (answers only update the counter).
+      const key = [s.epoch, s.phase, s.round, s.index, s.total, s.results ? s.results.total : -1].join('|');
+      if (key !== renderedKey) {
+        renderedKey = key;
+        build(s);
+      }
+      const players = document.querySelector('[data-count=players]');
+      if (players) players.textContent = s.playerCount;
+      const answered = document.querySelector('[data-count=answered]');
+      if (answered) answered.textContent = s.answeredCount;
+    }
+
+    function build(s) {
       $('corner-qr').hidden = s.phase !== 'open';
 
       if (s.phase === 'open' && s.question) {
@@ -89,11 +186,6 @@
         el('div', {}, qr, el('div', { class: 'join-url' }, joinUrl))));
       renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.3, window.innerHeight * 0.5)));
     }
-
-    startPolling(async () => apply(await api('screen')), err => {
-      $('status').textContent = err ? err.message : '';
-      $('status').className = 'status' + (err ? ' error' : '');
-    }, POLL_GAP_MS.screen);
   </script>
 </body>
 </html>

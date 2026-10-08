@@ -1,0 +1,7 @@
+{
+  "private": true,
+  "description": "Local rehearsal tools for the lab retreat game",
+  "dependencies": {
+    "mqtt": "5.10.1"
+  }
+}

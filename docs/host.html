@@ -9,6 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body>
   <main class="wrap" id="login-wrap">
@@ -36,9 +37,11 @@
     </div>
 
     <div class="stats">
+      <span class="pill" id="server-pill"></span>
       <span class="pill phase" id="phase-pill"></span>
       <span class="pill">משתתפים: <b id="player-count">0</b></span>
       <span class="pill" id="answered-pill" hidden>ענו: <b id="answered-count">0</b></span>
+      <span class="pill" id="sheet-pill"></span>
     </div>
 
     <div class="grid2">
@@ -57,12 +60,11 @@
       <button id="lobby-btn" type="button">חזרה ללובי</button>
       <button id="end-btn" type="button">מסך סיום</button>
     </div>
-    <p id="status" class="status" style="text-align:start"></p>
 
     <section class="card">
       <div class="card-head">
         <h3 style="margin:0">משתתפים</h3>
-        <button class="danger" id="clear-players" type="button">ניקוי הרשימה</button>
+        <button class="danger" id="reset-btn" type="button">משחק חדש</button>
       </div>
       <div class="chips" id="players"></div>
       <div class="muted small">ירוק = כבר ענה/תה על השאלה הפתוחה.</div>
@@ -79,35 +81,36 @@
 
   <script src="config.js"></script>
   <script src="assets/common.js"></script>
+  <script src="assets/relay.js"></script>
   <script>
     const $ = id => document.getElementById(id);
-    let password = sessionStorage.getItem('hostPassword') || '';
-    let state = null;
-    let questions = [];
-    let questionsError = null;
-    let busy = false;
-
+    const SERVER_ALIVE_MS = 10000;
     const TYPE_LABELS = { scale: 'סולם', yesno: 'כן / לא', choice: 'בחירה' };
 
-    function hostApi(action, payload) {
-      return api(action, Object.assign({ password }, payload || {}));
+    let relay = null;
+    let state = null;
+    let host = null;
+    let heartbeatAt = 0;
+    let connected = 0;
+    let waitingSince = 0; // a command was sent and we're waiting for the screen to apply it
+    let renderedNowKey = null;
+
+    // ---------- login (just separates host from players) ----------
+
+    function tryLogin(password) {
+      if (password !== window.APP_CONFIG.HOST_PASSWORD) return false;
+      sessionStorage.setItem('hostPassword', password);
+      $('login-wrap').hidden = true;
+      $('panel').hidden = false;
+      connect();
+      return true;
     }
 
-    function setStatus(err, target) {
-      const node = $(target || 'status');
-      node.textContent = err ? err.message : '';
-      node.className = 'status' + (err ? ' error' : '');
-    }
-
-    // ---------- login ----------
-
-    $('login-form').addEventListener('submit', async e => {
+    $('login-form').addEventListener('submit', e => {
       e.preventDefault();
-      password = $('password').value;
-      try {
-        await start();
-      } catch (err) {
-        setStatus(err, 'login-status');
+      if (!tryLogin($('password').value)) {
+        $('login-status').textContent = 'סיסמה שגויה.';
+        $('login-status').className = 'status error';
       }
     });
 
@@ -116,87 +119,61 @@
       location.reload();
     });
 
-    async function start() {
-      const s = await hostApi('host');
-      sessionStorage.setItem('hostPassword', password);
-      $('login-wrap').hidden = true;
-      $('panel').hidden = false;
-      apply(s);
-      await loadQuestions();
-      render();
-      startPolling(async () => {
-        if (busy) return;
-        const s = await hostApi('host');
-        if (!busy) apply(s); // an action may have started (and returned newer state) meanwhile
-      }, err => { if (!busy) setStatus(err); }, POLL_GAP_MS.host);
-    }
+    // ---------- live connection ----------
 
-    /** Errors are kept and shown in the question list (the status line is cleared by every poll). */
-    async function loadQuestions() {
-      try {
-        questions = await hostApi('questions');
-        questionsError = null;
-      } catch (err) {
-        questionsError = err;
-      }
-    }
-
-    // ---------- actions ----------
-
-    async function act(action, payload, confirmText) {
-      if (busy) return;
-      if (confirmText && !confirm(confirmText)) return;
-      busy = true;
-      setButtonsDisabled(true);
-      $('primary-btn').textContent = 'רגע…';
-      try {
-        apply(await hostApi(action, payload));
-        setStatus(null);
-      } catch (err) {
-        setStatus(err);
-      } finally {
-        busy = false;
-        setButtonsDisabled(false);
-      }
-    }
-
-    function setButtonsDisabled(disabled) {
-      document.querySelectorAll('#panel button').forEach(b => {
-        if (b.id !== 'logout') b.disabled = disabled;
+    function connect() {
+      relay = new Relay(n => { connected = n; render(); });
+      relay.subscribe('server', () => { heartbeatAt = Date.now(); render(); });
+      relay.subscribe('state', s => {
+        if (!isNewerState(s, state)) return;
+        state = s;
+        waitingSince = 0;
+        render();
       });
+      relay.subscribe('host', h => {
+        if (!isNewerState(h, host)) return;
+        host = h;
+        render();
+      });
+      setInterval(() => {
+        relay.publish('in', { type: 'ping' }); // the screen answers with a heartbeat
+        render(); // refresh the "screen connected" indicator
+      }, 2000);
+      render();
     }
+
+    function send(cmd, extra, confirmText) {
+      if (confirmText && !confirm(confirmText)) return;
+      relay.publish('in', Object.assign({
+        type: 'cmd', cmd, password: window.APP_CONFIG.HOST_PASSWORD, t: Date.now(),
+      }, extra || {}));
+      waitingSince = Date.now();
+      render();
+    }
+
+    // ---------- controls ----------
+
+    const questions = () => (host && host.questions) || [];
+    const nextIndex = () => (state ? state.index + 1 : 0);
 
     function openQuestion(index) {
-      const warn = state && state.phase === 'open'
-        ? 'השאלה הפתוחה תיסגר והתשובות שלה יישמרו. להמשיך?'
-        : null;
-      act('open', { index }, warn);
-    }
-
-    function nextIndex() {
-      return state ? state.index + 1 : 0;
+      const warn = state && state.phase === 'open' ? 'השאלה הפתוחה תיסגר והתשובות שלה יישמרו. להמשיך?' : null;
+      send('open', { index }, warn);
     }
 
     $('primary-btn').addEventListener('click', () => {
-      if (state.phase === 'open') return act('close');
-      if (nextIndex() < questions.length) return openQuestion(nextIndex());
-      act('end');
+      if (!state) return;
+      if (state.phase === 'open') return send('close');
+      if (nextIndex() < questions().length) return openQuestion(nextIndex());
+      send('end');
     });
-    $('lobby-btn').addEventListener('click', () => act('lobby'));
-    $('end-btn').addEventListener('click', () => act('end', null, 'לעבור למסך הסיום?'));
-    $('clear-players').addEventListener('click', () =>
-      act('clearPlayers', null, 'לנקות את רשימת המשתתפים? (משתתפים מחוברים יופיעו שוב בפעם הבאה שירעננו)'));
-    $('reload-questions').addEventListener('click', async () => {
-      await loadQuestions();
-      render();
-    });
+    $('lobby-btn').addEventListener('click', () => send('lobby'));
+    $('end-btn').addEventListener('click', () => send('end', null, 'לעבור למסך הסיום?'));
+    $('reload-questions').addEventListener('click', () => send('reloadQuestions'));
+    $('reset-btn').addEventListener('click', () => send('resetGame', null,
+      'להתחיל משחק חדש? רשימת המשתתפים תתאפס והמשחק יחזור ללובי. (מה שכבר נשמר בגיליון נשאר.)'));
 
     // ---------- rendering ----------
-
-    function apply(next) {
-      state = next;
-      render();
-    }
 
     function questionBlock(q, extra) {
       return el('div', {},
@@ -209,16 +186,7 @@
         extra || null);
     }
 
-    function render() {
-      if (!state) return;
-      const s = state;
-      $('phase-pill').textContent = PHASE_LABELS[s.phase] || s.phase;
-      $('player-count').textContent = s.players.length;
-      $('answered-pill').hidden = s.phase !== 'open';
-      $('answered-count').textContent = s.answered.length + ' / ' + s.players.length;
-
-      // Now
-      const now = $('now');
+    function renderNow(s) {
       if ((s.phase === 'open' || s.phase === 'results') && s.question) {
         let extra = null;
         if (s.phase === 'results' && s.results) {
@@ -226,54 +194,105 @@
           renderBars(extra, s.results, s.question.type);
           extra.append(el('div', { class: 'muted small' }, 'סה״כ ' + s.results.total + ' תשובות'));
         }
-        now.replaceChildren(el('div', { class: 'counter' }, questionCounter(s)), questionBlock(s.question, extra));
+        $('now').replaceChildren(el('div', { class: 'counter' }, questionCounter(s)), questionBlock(s.question, extra));
       } else {
-        now.replaceChildren(el('div', { class: 'muted' },
+        $('now').replaceChildren(el('div', { class: 'muted' },
           s.phase === 'end' ? 'המשחק הסתיים (מסך הסיום מוצג).' : 'לובי: אין שאלה פתוחה.'));
+      }
+    }
+
+    function render() {
+      if (!relay) return;
+      const alive = Date.now() - heartbeatAt < SERVER_ALIVE_MS;
+      const pill = $('server-pill');
+      if (!connected) { pill.textContent = 'אין חיבור לאינטרנט / לשרת ההודעות'; pill.className = 'pill bad'; }
+      else if (!alive) { pill.textContent = 'מסך התצוגה לא פתוח'; pill.className = 'pill bad'; }
+      else { pill.textContent = 'מסך התצוגה מחובר ✓'; pill.className = 'pill good'; }
+
+      // A command that got no response within 4s is no longer "in flight".
+      if (waitingSince && Date.now() - waitingSince > 4000) waitingSince = 0;
+      const busy = !!waitingSince;
+      document.querySelectorAll('#panel button').forEach(b => {
+        if (b.id !== 'logout') b.disabled = busy || !alive || !state;
+      });
+
+      if (!state) {
+        renderedNowKey = null;
+        $('phase-pill').textContent = 'מחכה למסך התצוגה…';
+        $('now').replaceChildren(el('div', { class: 'muted' },
+          'פתחו את מסך התצוגה (screen.html) במחשב שמחובר למקרן. המשחק עצמו רץ שם.'));
+        $('next').replaceChildren();
+        $('primary-btn').textContent = '…';
+        return;
+      }
+
+      const s = state;
+      const qs = questions();
+      const players = host ? host.players : [];
+      const answered = host ? host.answered : [];
+      $('phase-pill').textContent = PHASE_LABELS[s.phase] || s.phase;
+      $('player-count').textContent = s.playerCount;
+      $('answered-pill').hidden = s.phase !== 'open';
+      $('answered-count').textContent = s.answeredCount + ' / ' + s.playerCount;
+
+      const sheet = $('sheet-pill');
+      if (!host) { sheet.textContent = ''; sheet.hidden = true; }
+      else {
+        sheet.hidden = false;
+        if (host.uploadError) { sheet.textContent = 'שמירה לגיליון נכשלה, מנסה שוב: ' + host.uploadError; sheet.className = 'pill bad'; }
+        else if (host.pendingUploads) { sheet.textContent = 'שומר לגיליון…'; sheet.className = 'pill'; }
+        else { sheet.textContent = 'גיליון: הכול נשמר ✓'; sheet.className = 'pill good'; }
+      }
+
+      // Now (rebuilt only when it changes, so the chart doesn't re-animate)
+      const nowKey = [s.epoch, s.phase, s.round, s.index, s.results ? s.results.total : -1].join('|');
+      if (nowKey !== renderedNowKey) {
+        renderedNowKey = nowKey;
+        renderNow(s);
       }
 
       // Next
       const ni = nextIndex();
-      const nextQ = questions[ni];
+      const nextQ = qs[ni];
       $('next').replaceChildren(nextQ
-        ? el('div', {}, el('div', { class: 'counter' }, 'שאלה ' + (ni + 1) + ' מתוך ' + questions.length), questionBlock(nextQ))
+        ? el('div', {}, el('div', { class: 'counter' }, 'שאלה ' + (ni + 1) + ' מתוך ' + qs.length), questionBlock(nextQ))
         : el('div', { class: 'muted' }, 'אין שאלות נוספות.'));
 
       // Primary control
       const primary = $('primary-btn');
-      if (s.phase === 'open') primary.textContent = 'סגירת השאלה והצגת התוצאות';
+      if (busy) primary.textContent = 'רגע…';
+      else if (s.phase === 'open') primary.textContent = 'סגירת השאלה והצגת התוצאות';
       else if (nextQ) primary.textContent = 'פתיחת שאלה ' + (ni + 1) + ' ←';
       else primary.textContent = 'מעבר למסך הסיום';
       primary.hidden = s.phase === 'end' && !nextQ;
 
       // Players
-      const answered = new Set(s.answered);
-      $('players').replaceChildren(...(s.players.length
-        ? s.players.map(p => el('span', { class: 'chip' + (answered.has(p) ? ' done' : '') }, p))
+      const done = new Set(answered);
+      $('players').replaceChildren(...(players.length
+        ? players.map(p => el('span', { class: 'chip' + (done.has(p) ? ' done' : '') }, p))
         : [el('span', { class: 'muted' }, 'עוד אין משתתפים.')]));
 
       // Question list
-      if (questionsError) {
+      if (host && host.questionsError) {
         $('qlist').replaceChildren(el('li', { class: 'status error', style: 'text-align:start' },
-          'טעינת השאלות מהגיליון נכשלה: ' + questionsError.message));
+          'טעינת השאלות מהגיליון נכשלה: ' + host.questionsError));
         return;
       }
-      $('qlist').replaceChildren(...questions.map((q, i) => {
+      if (!qs.length) {
+        $('qlist').replaceChildren(el('li', { class: 'muted' }, 'טוען שאלות מהגיליון…'));
+        return;
+      }
+      $('qlist').replaceChildren(...qs.map((q, i) => {
         const isCurrent = i === s.index && (s.phase === 'open' || s.phase === 'results');
         return el('li', { class: isCurrent ? 'current' : '' },
           el('span', { class: 'qnum' }, i + 1),
-          el('div', { class: 'qbody' }, q.text,
-            el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
-          el('button', { type: 'button', onclick: () => openQuestion(i), disabled: busy }, 'פתיחה'));
+          el('div', { class: 'qbody' }, q.text, el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
+          el('button', { type: 'button', onclick: () => openQuestion(i), disabled: busy || !alive }, 'פתיחה'));
       }));
     }
 
-    if (password) {
-      start().catch(err => {
-        sessionStorage.removeItem('hostPassword');
-        setStatus(err, 'login-status');
-      });
-    }
+    const remembered = sessionStorage.getItem('hostPassword');
+    if (remembered) tryLogin(remembered);
   </script>
 </body>
 </html>
