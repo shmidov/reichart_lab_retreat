@@ -1,0 +1,22 @@
+# OS
+.DS_Store
+
+# Secrets / credentials (e.g. Google service-account keys)
+.env
+*.env
+credentials*.json
+service-account*.json
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Node
+node_modules/
+dist/
+
+# Editors
+.vscode/
+.idea/
