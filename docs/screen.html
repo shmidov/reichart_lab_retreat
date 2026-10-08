@@ -93,7 +93,7 @@
     startPolling(async () => apply(await api('screen')), err => {
       $('status').textContent = err ? err.message : '';
       $('status').className = 'status' + (err ? ' error' : '');
-    });
+    }, POLL_GAP_MS.screen);
   </script>
 </body>
 </html>

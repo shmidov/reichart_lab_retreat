@@ -83,7 +83,6 @@ const context = vm.createContext({
   },
 });
 vm.runInContext(fs.readFileSync(path.join(ROOT, 'apps-script', 'Code.gs'), 'utf8'), context, { filename: 'Code.gs' });
-context.setup();
 
 // ---------- HTTP ----------
 

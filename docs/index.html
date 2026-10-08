@@ -69,7 +69,7 @@
       $('game').hidden = false;
       applyState(data, true);
       if (!stopPolling) {
-        stopPolling = startPolling(async () => applyState(await api('state')), setStatus);
+        stopPolling = startPolling(async () => applyState(await api('state')), setStatus, POLL_GAP_MS.player);
       }
     }
 

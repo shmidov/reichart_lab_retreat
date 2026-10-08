@@ -11,7 +11,11 @@ One-time setup: about 10 minutes. You need a Google account and access to this G
    `HOST_PASSWORD` = the password the host will use.
 5. Back in the editor, select the function **`setup`** in the toolbar and click **Run**.
    Google asks for permission. Because the script is your own, choose *Advanced → Go to … (unsafe)* and allow.
-   This creates the tabs `Questions` (with three sample questions), `Responses` and `Summary`.
+   This creates the tabs `Questions` (with three sample questions), `Responses` and `Summary`. They appear as tabs
+   at the bottom of the Google Sheet, not in the Apps Script editor. You can skip this step: the tabs are also
+   created automatically the first time someone logs in on the host page.
+   If the script was created at script.google.com rather than from inside the Sheet, it isn't linked to the Sheet.
+   Add a script property `SHEET_ID` holding the Sheet's id: the long part of its URL between `/d/` and `/edit`.
 6. **Deploy → New deployment** → type **Web app**:
    - Execute as: **Me**
    - Who has access: **Anyone**

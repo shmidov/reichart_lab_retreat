@@ -122,7 +122,11 @@
       $('panel').hidden = false;
       await loadQuestions();
       apply(s);
-      startPolling(async () => { if (!busy) apply(await hostApi('host')); }, err => { if (!busy) setStatus(err); });
+      startPolling(async () => {
+        if (busy) return;
+        const s = await hostApi('host');
+        if (!busy) apply(s); // an action may have started (and returned newer state) meanwhile
+      }, err => { if (!busy) setStatus(err); }, POLL_GAP_MS.host);
     }
 
     async function loadQuestions() {
@@ -136,6 +140,7 @@
       if (confirmText && !confirm(confirmText)) return;
       busy = true;
       setButtonsDisabled(true);
+      $('primary-btn').textContent = 'רגע…';
       try {
         apply(await hostApi(action, payload));
         setStatus(null);

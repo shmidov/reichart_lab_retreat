@@ -1,6 +1,7 @@
 // Shared helpers for the player, host and screen pages.
 
-const POLL_MS = 2000;
+// Each Apps Script call already takes ~1s, so these are only the pauses *between* calls.
+const POLL_GAP_MS = { player: 700, host: 300, screen: 200 };
 
 async function api(action, payload) {
   const url = (window.APP_CONFIG || {}).API_URL || '';
@@ -16,20 +17,32 @@ async function api(action, payload) {
   return json.data;
 }
 
-/** Calls fn every POLL_MS (plus jitter), waiting for each call to finish. onStatus(err|null) after each call. */
-function startPolling(fn, onStatus) {
+/**
+ * Calls fn repeatedly, pausing gapMs (plus jitter) after each call finishes. onStatus(err|null) after each call.
+ * Polls right away when the tab becomes visible again (e.g. a phone waking up).
+ */
+function startPolling(fn, onStatus, gapMs) {
   let stopped = false;
+  let running = false;
+  let timer = null;
   async function tick() {
+    clearTimeout(timer);
+    if (running || stopped) return;
+    running = true;
     try {
       await fn();
       if (onStatus) onStatus(null);
     } catch (err) {
       if (onStatus) onStatus(err);
     }
-    if (!stopped) setTimeout(tick, POLL_MS + Math.random() * 500);
+    running = false;
+    if (!stopped) timer = setTimeout(tick, gapMs + Math.random() * 300);
   }
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tick();
+  });
   tick();
-  return () => { stopped = true; };
+  return () => { stopped = true; clearTimeout(timer); };
 }
 
 /** Tiny DOM builder: el('div', {class: 'x', onclick: fn}, 'text', childNode). Text is never parsed as HTML. */

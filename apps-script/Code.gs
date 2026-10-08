@@ -117,7 +117,7 @@ function checkHost_(password) {
 }
 
 function openQuestion_(index) {
-  const questions = readQuestions_();
+  const questions = cachedQuestions_();
   if (!(index >= 0 && index < questions.length)) throw new Error('אין שאלה מספר ' + (index + 1) + '.');
   let state = getState_(true);
   if (state.phase === 'open') state = closeQuestion_();
@@ -145,22 +145,26 @@ function closeQuestion_() {
   });
   answers.sort((a, b) => a.name.localeCompare(b.name, 'he'));
 
-  const now = new Date();
-  replaceQuestionRows_(RESPONSES_SHEET, RESPONSE_HEADERS, 1, q.id,
-    answers.map(a => [now, q.id, q.text, a.name, a.answer]));
-
   const total = answers.length;
   const counts = q.options.map(label => ({
     label: label,
     count: answers.filter(a => a.answer === label).length,
   }));
+
+  // Publish the results first, so the screens update without waiting for the (slow) Sheet writes.
+  state.phase = 'results';
+  state.results = { counts: counts, total: total };
+  saveState_(state);
+
+  const now = new Date();
+  replaceQuestionRows_(RESPONSES_SHEET, RESPONSE_HEADERS, 1, q.id,
+    answers.map(a => [now, q.id, q.text, a.name, a.answer]));
   replaceQuestionRows_(SUMMARY_SHEET, SUMMARY_HEADERS, 0, q.id,
     counts.map(c => [q.id, q.text, c.label, c.count, total ? Math.round(c.count / total * 1000) / 10 : 0, total]));
 
+  // Live answers are cleared only after they are safely in the Sheet.
   clearAnswers_(all);
-  state.phase = 'results';
-  state.results = { counts: counts, total: total };
-  return saveState_(state);
+  return state;
 }
 
 /** Back to the lobby or to the end screen. An open question is closed (and saved) first. */
@@ -272,9 +276,31 @@ function withLock_(fn) {
 
 // ---------- Sheets ----------
 
+/**
+ * The game's spreadsheet: the one this script is bound to (Extensions → Apps Script), or,
+ * for a standalone script, the one whose id is in the SHEET_ID script property.
+ */
+function getSpreadsheet_() {
+  const active = SpreadsheetApp.getActive();
+  if (active) return active;
+  const id = PropertiesService.getScriptProperties().getProperty('SHEET_ID');
+  if (id) return SpreadsheetApp.openById(id);
+  throw new Error('הסקריפט לא מחובר לגיליון. פתחו אותו מתוך הגיליון (Extensions → Apps Script) או הגדירו SHEET_ID ב-Script properties.');
+}
+
+/** Questions from the cache (fast); falls back to reading the Sheet. */
+function cachedQuestions_() {
+  const cached = CacheService.getScriptCache().get('questions');
+  return cached ? JSON.parse(cached) : readQuestions_();
+}
+
+/** Reads the Questions sheet (creating the game's tabs if they don't exist yet) and refreshes the cache. */
 function readQuestions_() {
-  const sheet = SpreadsheetApp.getActive().getSheetByName(QUESTIONS_SHEET);
-  if (!sheet) throw new Error('הגיליון "Questions" חסר. הריצו את setup() קודם.');
+  let sheet = getSpreadsheet_().getSheetByName(QUESTIONS_SHEET);
+  if (!sheet) {
+    setup();
+    sheet = getSpreadsheet_().getSheetByName(QUESTIONS_SHEET);
+  }
   const values = sheet.getDataRange().getDisplayValues();
   const header = values[0].map(h => String(h).trim().toLowerCase());
   const col = {};
@@ -290,6 +316,7 @@ function readQuestions_() {
     questions.push(parseQuestion_(id, text, cell(row, 'explanation'), cell(row, 'type'), cell(row, 'options')));
   });
   if (!questions.length) throw new Error('אין שאלות בגיליון "Questions".');
+  CacheService.getScriptCache().put('questions', JSON.stringify(questions), CACHE_SECONDS);
   return questions;
 }
 
@@ -328,7 +355,7 @@ function replaceQuestionRows_(sheetName, headers, idCol, questionId, newRows) {
 }
 
 function getOrCreateSheet_(name, headers) {
-  const ss = SpreadsheetApp.getActive();
+  const ss = getSpreadsheet_();
   let sheet = ss.getSheetByName(name);
   if (!sheet) {
     sheet = ss.insertSheet(name);
@@ -353,7 +380,7 @@ function cleanName_(name) {
 // ---------- One-time setup (run from the Apps Script editor) ----------
 
 function setup() {
-  const ss = SpreadsheetApp.getActive();
+  const ss = getSpreadsheet_();
   if (!ss.getSheetByName(QUESTIONS_SHEET)) {
     const sheet = ss.insertSheet(QUESTIONS_SHEET);
     // Plain-text options column, so "1-10" isn't turned into a date.
