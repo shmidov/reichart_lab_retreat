@@ -12,6 +12,7 @@
   retrying, and the host page shows the status ("גיליון: הכול נשמר ✓").
 
 Settings are in [`docs/config.js`](docs/config.js):
+- `GAME_TITLE`: the game's name, shown on every screen (currently the placeholder "שם למשחק").
 - `HOST_PASSWORD`: the host password. It only separates the host from the players.
 - `GAME_ID`: separates this game's messages from anyone else's on the public relays.
 - `API_URL`: the Apps Script URL.

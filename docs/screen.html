@@ -6,27 +6,28 @@
   <title>מסך תצוגה</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body class="screen">
   <div class="stage">
-    <div class="brand">
-      <span>ריטריט מעבדת רייכרט</span>
-      <span class="screen-status">
+    <header class="stage-top">
+      <div class="brand"><span class="brand-mark"></span><span data-game-title></span></div>
+      <div class="screen-status">
         <span id="conn"></span>
         <span id="role"></span>
         <button class="link" id="takeover" type="button" hidden>להפוך למסך הראשי</button>
-      </span>
-    </div>
+        <span class="live off" id="live">מתחבר…</span>
+      </div>
+    </header>
     <div class="stage-body" id="body">
-      <div class="center muted"><span class="dots">מתחבר</span></div>
+      <div class="center"><div class="orb"></div></div>
     </div>
   </div>
   <div class="corner-qr" id="corner-qr" hidden>
-    <div class="qr-box" id="corner-qr-code"></div>
+    <div class="qr-frame"><div class="qr-box" id="corner-qr-code"></div></div>
     <div>להצטרפות</div>
   </div>
 
@@ -58,8 +59,10 @@
     let heartbeatAt = 0;
 
     const relay = new Relay((connected, total) => {
-      $('conn').textContent = connected ? '' : 'אין חיבור לשרת ההודעות, מנסה שוב…';
+      $('conn').textContent = connected ? '' : 'אין חיבור, מנסה שוב…';
       $('conn').className = connected ? '' : 'status error';
+      $('live').textContent = connected ? 'LIVE' : 'מתחבר…';
+      $('live').className = 'live' + (connected ? '' : ' off');
     });
 
     let otherBeats = 0; // live heartbeats from another screen since this page loaded
@@ -109,7 +112,7 @@
     function becomeViewer() {
       if (server) { server.stop(); server = null; }
       mode = 'viewer';
-      $('role').textContent = 'מסך משני (המשחק רץ על מסך אחר)';
+      $('role').textContent = 'מסך משני';
       $('takeover').hidden = false;
       if (lastState) { state = lastState; render(); }
     }
@@ -139,52 +142,71 @@
         renderedKey = key;
         build(s);
       }
-      const players = document.querySelector('[data-count=players]');
-      if (players) players.textContent = s.playerCount;
-      const answered = document.querySelector('[data-count=answered]');
-      if (answered) answered.textContent = s.answeredCount;
+      document.querySelectorAll('[data-count=players]').forEach(n => { n.textContent = s.playerCount; });
+      document.querySelectorAll('[data-count=answered]').forEach(n => { n.textContent = s.answeredCount; });
+    }
+
+    function progress(s) {
+      return el('div', { class: 'progress' }, Array.from({ length: s.total }, (_, i) =>
+        el('span', { class: i < s.index ? 'done' : i === s.index ? 'now' : '' })));
+    }
+
+    function scene(...children) {
+      setChildren(body, el('div', { class: 'scene' }, children));
     }
 
     function build(s) {
       $('corner-qr').hidden = s.phase !== 'open';
 
       if (s.phase === 'open' && s.question) {
-        body.replaceChildren(
+        scene(
+          progress(s),
           el('div', { class: 'counter' }, questionCounter(s)),
           el('p', { class: 's-question' }, s.question.text),
           s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
-          el('div', { class: 'big-count' }, el('b', { 'data-count': 'answered' }), ' ענו עד עכשיו'));
+          optionsPreview(s.question),
+          el('div', { class: 'meter' },
+            el('span', { class: 'big', 'data-count': 'answered' }),
+            el('span', {}, 'ענו מתוך'),
+            el('span', { class: 'mono', 'data-count': 'players' })));
         return;
       }
 
       if (s.phase === 'results' && s.question && s.results) {
         const chart = el('div');
-        body.replaceChildren(
+        scene(
+          progress(s),
           el('div', { class: 'counter' }, questionCounter(s)),
           el('p', { class: 's-question compact' }, s.question.text),
           s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
           chart,
-          el('div', { class: 'big-count', style: 'margin-top:2vh' }, 'סה״כ ', el('b', {}, s.results.total), ' תשובות'));
-        renderBars(chart, s.results, s.question.type);
+          el('div', { class: 'meter small', style: 'margin-top:2.5vh' },
+            el('span', { class: 'big' }, s.results.total),
+            el('span', {}, 'תשובות')));
+        renderBars(chart, s.results, s.question);
         return;
       }
 
       if (s.phase === 'end') {
-        body.replaceChildren(el('div', { class: 'center' },
-          el('div', { class: 'emoji' }, '🎉'),
-          el('h1', {}, 'תודה רבה לכולם!')));
+        scene(el('div', { class: 'finale' },
+          el('div', { class: 'orb calm', style: 'width:140px;height:140px' }),
+          el('h1', { class: 'grad-text' }, 'תודה רבה!'),
+          el('p', { class: 'muted' }, GAME_TITLE)));
         return;
       }
 
       // Lobby
       const qr = el('div', { class: 'qr-box' });
-      body.replaceChildren(el('div', { class: 'lobby' },
+      scene(el('div', { class: 'lobby' },
         el('div', {},
-          el('h1', {}, 'מה דעתכם?'),
-          el('p', { class: 'explanation' }, 'סרקו את הקוד, הזינו את השם שלכם וחכו לשאלה הראשונה.'),
-          el('div', { class: 'big-count' }, el('b', { 'data-count': 'players' }), ' משתתפים הצטרפו')),
-        el('div', {}, qr, el('div', { class: 'join-url' }, joinUrl))));
-      renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.3, window.innerHeight * 0.5)));
+          el('div', { class: 'eyebrow' }, 'סרקו כדי להצטרף'),
+          el('h1', { class: 'grad-text' }, GAME_TITLE),
+          el('p', { class: 'lead' }, 'סרקו את הקוד, הזינו את השם שלכם וחכו לשאלה הראשונה.'),
+          el('div', { class: 'meter' },
+            el('span', { class: 'big', 'data-count': 'players' }),
+            el('span', {}, 'משתתפים הצטרפו'))),
+        el('div', {}, el('div', { class: 'qr-frame' }, qr), el('div', { class: 'join-url' }, joinUrl))));
+      renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.26, window.innerHeight * 0.46)));
     }
   </script>
 </body>

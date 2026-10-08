@@ -7,14 +7,17 @@
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body>
   <main class="wrap" id="login-wrap">
-    <div class="brand">ריטריט מעבדת רייכרט · מנחה</div>
-    <section class="card">
+    <header class="appbar">
+      <div class="brand"><span class="brand-mark"></span><span data-game-title></span></div>
+    </header>
+    <section class="card enter">
+      <div class="eyebrow">לוח מנחה</div>
       <h1>כניסת מנחה</h1>
       <form id="login-form">
         <label>סיסמה
@@ -28,7 +31,7 @@
 
   <main class="wrap wide" id="panel" hidden>
     <div class="topbar">
-      <div class="brand" style="margin:0">ריטריט מעבדת רייכרט · לוח מנחה</div>
+      <div class="brand"><span class="brand-mark"></span><span data-game-title></span><span class="muted" style="font-weight:400">· לוח מנחה</span></div>
       <div class="links">
         <a href="screen.html" target="_blank" rel="noopener">פתיחת מסך התצוגה ↗</a>
         <a href="./" target="_blank" rel="noopener">עמוד המשתתפים ↗</a>
@@ -40,17 +43,17 @@
       <span class="pill" id="server-pill"></span>
       <span class="pill phase" id="phase-pill"></span>
       <span class="pill">משתתפים: <b id="player-count">0</b></span>
-      <span class="pill" id="answered-pill" hidden>ענו: <b id="answered-count">0</b></span>
+      <span class="pill" id="answered-pill" hidden>ענו: <b id="answered-count" dir="ltr">0</b></span>
       <span class="pill" id="sheet-pill"></span>
     </div>
 
     <div class="grid2">
-      <section class="card">
-        <h3>עכשיו</h3>
+      <section class="card now">
+        <div class="eyebrow">עכשיו</div>
         <div id="now"></div>
       </section>
       <section class="card">
-        <h3>הבאה בתור</h3>
+        <div class="eyebrow">הבאה בתור</div>
         <div id="next"></div>
       </section>
     </div>
@@ -63,16 +66,16 @@
 
     <section class="card">
       <div class="card-head">
-        <h3 style="margin:0">משתתפים</h3>
+        <div class="eyebrow">משתתפים</div>
         <button class="danger" id="reset-btn" type="button">משחק חדש</button>
       </div>
       <div class="chips" id="players"></div>
-      <div class="muted small">ירוק = כבר ענה/תה על השאלה הפתוחה.</div>
+      <div class="muted small">מודגש = כבר ענה/תה על השאלה הפתוחה.</div>
     </section>
 
     <section class="card">
       <div class="card-head">
-        <h3 style="margin:0">כל השאלות</h3>
+        <div class="eyebrow">כל השאלות</div>
         <button id="reload-questions" type="button">רענון מהגיליון</button>
       </div>
       <ul class="qlist" id="qlist"></ul>
@@ -191,7 +194,7 @@
         let extra = null;
         if (s.phase === 'results' && s.results) {
           extra = el('div', { class: 'host-bars' });
-          renderBars(extra, s.results, s.question.type);
+          renderBars(extra, s.results, s.question);
           extra.append(el('div', { class: 'muted small' }, 'סה״כ ' + s.results.total + ' תשובות'));
         }
         $('now').replaceChildren(el('div', { class: 'counter' }, questionCounter(s)), questionBlock(s.question, extra));
@@ -255,7 +258,7 @@
       const ni = nextIndex();
       const nextQ = qs[ni];
       $('next').replaceChildren(nextQ
-        ? el('div', {}, el('div', { class: 'counter' }, 'שאלה ' + (ni + 1) + ' מתוך ' + qs.length), questionBlock(nextQ))
+        ? el('div', {}, el('div', { class: 'counter' }, counterParts(ni, qs.length)), questionBlock(nextQ))
         : el('div', { class: 'muted' }, 'אין שאלות נוספות.'));
 
       // Primary control

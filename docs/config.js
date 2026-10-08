@@ -1,4 +1,7 @@
 window.APP_CONFIG = {
+  // The game's name, shown on every screen.
+  GAME_TITLE: 'שם למשחק',
+
   // Apps Script web-app URL (ends with /exec). Used only by the projector screen,
   // to load the questions and to save each question's answers. See SETUP.md.
   API_URL: 'https://script.google.com/macros/s/AKfycbwbvGGEVrz3mSHzmiGxzTtpbA-H6bgYyh02rPnci9slc4SHDqDPvdwrkwC4dC9ma-o3/exec',

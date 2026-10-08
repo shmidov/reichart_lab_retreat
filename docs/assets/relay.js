@@ -10,23 +10,46 @@ class Relay {
     this.handlers = new Map(); // topic suffix -> handler
     this.seen = new Map(); // message id -> receive time
     this.onStatus = onStatus || (() => {});
-    this.clients = (config.BROKERS || []).map(url => {
-      const client = mqtt.connect(url, {
-        clientId: 'rlr-' + randomId(),
-        clean: true,
-        keepalive: 30,
-        connectTimeout: 10000,
-        reconnectPeriod: 2000,
-        resubscribe: false, // we subscribe ourselves on every (re)connect
-      });
-      client.on('connect', () => {
-        this.handlers.forEach((_, suffix) => client.subscribe(this.prefix + suffix, { qos: 1 }));
-        this.emitStatus();
-      });
-      client.on('close', () => this.emitStatus());
-      client.on('error', () => this.emitStatus());
-      client.on('message', (topic, payload) => this.receive(topic, payload));
-      return client;
+    this.urls = config.BROKERS || [];
+    this.clients = this.urls.map(url => this.createClient(url));
+
+    // mqtt.js can get stuck mid-reconnect (e.g. after the laptop sleeps or the tab was in the background).
+    // Any connection that has been down for a while is replaced with a brand-new one.
+    const check = () => this.watchdog();
+    setInterval(check, 5000);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') check(); });
+    window.addEventListener('online', check);
+  }
+
+  createClient(url) {
+    const client = mqtt.connect(url, {
+      clientId: 'rlr-' + randomId(),
+      clean: true,
+      keepalive: 30,
+      connectTimeout: 10000,
+      reconnectPeriod: 2000,
+      resubscribe: false, // we subscribe ourselves on every (re)connect
+    });
+    client.downSince = Date.now();
+    client.on('connect', () => {
+      client.downSince = 0;
+      this.handlers.forEach((_, suffix) => client.subscribe(this.prefix + suffix, { qos: 1 }));
+      this.emitStatus();
+    });
+    client.on('close', () => {
+      if (!client.downSince) client.downSince = Date.now();
+      this.emitStatus();
+    });
+    client.on('error', () => this.emitStatus());
+    client.on('message', (topic, payload) => this.receive(topic, payload));
+    return client;
+  }
+
+  watchdog() {
+    this.clients.forEach((client, i) => {
+      if (client.connected || !client.downSince || Date.now() - client.downSince < 15000) return;
+      try { client.end(true); } catch (err) { /* already broken */ }
+      this.clients[i] = this.createClient(this.urls[i]);
     });
   }
 

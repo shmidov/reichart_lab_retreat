@@ -3,19 +3,24 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ריטריט המעבדה</title>
+  <title></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
 <body>
   <main class="wrap">
-    <div class="brand">ריטריט מעבדת רייכרט</div>
+    <header class="appbar">
+      <div class="brand"><span class="brand-mark"></span><span data-game-title></span></div>
+      <span class="live off" id="live">מתחבר…</span>
+    </header>
 
-    <section id="join" class="card" hidden>
-      <h1>ברוכים הבאים!</h1>
+    <section id="join" class="card enter" hidden>
+      <div class="eyebrow">הצטרפות</div>
+      <h1>ברוכים הבאים</h1>
+      <p class="muted">רק שם, בלי סיסמה.</p>
       <form id="join-form">
         <label>איך קוראים לך?
           <input type="text" id="name-input" maxlength="40" autocomplete="name" required>
@@ -25,8 +30,8 @@
     </section>
 
     <section id="game" hidden>
-      <div class="who">משתתף/ת בתור <b id="me"></b><button class="link" id="rename" type="button">החלפת שם</button></div>
       <div id="view" class="card"></div>
+      <div class="who">משתתף/ת בתור <b id="me"></b> · <button class="link" id="rename" type="button">החלפת שם</button></div>
     </section>
 
     <p id="status" class="status"></p>
@@ -38,7 +43,7 @@
   <script>
     const $ = id => document.getElementById(id);
     const view = $('view');
-    const SAVED_NOTE = 'נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה';
+    const SAVED_NOTE = 'נשמר ✓ אפשר לשנות עד שהשאלה נסגרת';
 
     let playerId = storage.get('playerId');
     if (!playerId) { playerId = randomId(); storage.set('playerId', playerId); }
@@ -46,8 +51,8 @@
     let state = null;
 
     const relay = new Relay(connected => {
-      $('status').textContent = connected ? '' : 'אין חיבור, מנסה שוב…';
-      $('status').className = 'status' + (connected ? '' : ' error');
+      $('live').textContent = connected ? 'LIVE' : 'מתחבר…';
+      $('live').className = 'live' + (connected ? '' : ' off');
       if (connected && name) sendJoin(); // (re)announce ourselves after every reconnect
     });
 
@@ -156,6 +161,13 @@
 
     // ---------- rendering ----------
 
+    function show(...children) {
+      setChildren(view, ...children);
+      view.classList.remove('enter');
+      void view.offsetWidth; // restart the entrance animation
+      view.classList.add('enter');
+    }
+
     function render() {
       if ($('game').hidden) return;
       const s = state;
@@ -168,41 +180,43 @@
 
       if (s && s.phase === 'results' && s.question) {
         const mine = storage.get(answerKey(s.round));
-        view.replaceChildren(
+        show(
           el('div', { class: 'counter' }, questionCounter(s)),
-          el('h2', {}, s.question.text),
-          el('div', { class: 'center', style: 'margin-top:18px' },
-            el('div', { class: 'emoji' }, '👀'),
-            el('p', {}, 'התשובות ננעלו. הסתכלו על המסך הגדול!'),
+          el('h2', { class: 'q-title' }, s.question.text),
+          el('div', { class: 'center', style: 'margin-top:26px' },
+            el('div', { class: 'icon-badge' }, icon('lock')),
+            el('p', {}, 'התשובות ננעלו. התוצאות על המסך הגדול.'),
             el('p', { class: 'muted' }, mine ? 'ענית: ' + mine : 'לא ענית על השאלה הזו.')));
         return;
       }
 
       if (s && s.phase === 'end') {
-        view.replaceChildren(el('div', { class: 'center' },
-          el('div', { class: 'emoji' }, '🎉'),
+        show(el('div', { class: 'center' },
+          el('div', { class: 'orb calm' }),
           el('h2', {}, 'תודה שהשתתפתם!')));
         return;
       }
 
-      view.replaceChildren(el('div', { class: 'center' },
-        el('div', { class: 'emoji' }, '☕'),
-        el('h2', {}, 'היי ' + name + '!'),
-        el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'מחכים שהמנחה יפתח את השאלה הבאה'))));
+      show(el('div', { class: 'center' },
+        el('div', { class: 'orb' }),
+        el('h2', {}, 'היי ' + name),
+        el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'מחכים לשאלה הבאה'))));
     }
 
     function renderQuestion(s) {
       const q = s.question;
       const selected = storage.get(answerKey(s.round));
+      const colors = answerColors(q);
       const layout = q.type === 'scale' ? 'scale' : (q.options.length === 2 ? 'two' : '');
-      view.replaceChildren(
+      show(
         el('div', { class: 'counter' }, questionCounter(s)),
-        el('h2', {}, q.text),
+        el('h2', { class: 'q-title' }, q.text),
         q.explanation ? el('p', { class: 'explanation' }, q.explanation) : null,
         el('div', { class: 'options ' + layout, role: 'group' },
-          q.options.map(opt => el('button', {
+          q.options.map((opt, i) => el('button', {
             type: 'button',
             class: 'option' + (opt === selected ? ' selected' : ''),
+            style: '--c:' + colors[i],
             'data-value': opt,
             'aria-pressed': opt === selected ? 'true' : 'false',
             onclick: () => choose(opt),
