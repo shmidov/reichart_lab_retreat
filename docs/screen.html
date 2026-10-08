@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>מסך תצוגה</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="screen">
+  <div class="stage">
+    <div class="brand">
+      <span>ריטריט מעבדת רייכרט</span>
+      <span id="status" class="status" style="min-height:0"></span>
+    </div>
+    <div class="stage-body" id="body"></div>
+  </div>
+  <div class="corner-qr" id="corner-qr" hidden>
+    <div class="qr-box" id="corner-qr-code"></div>
+    <div>להצטרפות</div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    const body = $('body');
+    const joinUrl = playerUrl();
+    let state = null;
+
+    renderQr($('corner-qr-code'), joinUrl, 110);
+
+    function apply(next) {
+      const changed = !state || next.rev !== state.rev;
+      state = next;
+      if (changed) render();
+      updateCounts();
+    }
+
+    function updateCounts() {
+      const players = document.querySelector('[data-count=players]');
+      if (players) players.textContent = state.playerCount;
+      const answered = document.querySelector('[data-count=answered]');
+      if (answered) answered.textContent = state.answeredCount;
+    }
+
+    function render() {
+      const s = state;
+      $('corner-qr').hidden = s.phase !== 'open';
+
+      if (s.phase === 'open' && s.question) {
+        body.replaceChildren(
+          el('div', { class: 'counter' }, questionCounter(s)),
+          el('p', { class: 's-question' }, s.question.text),
+          s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
+          el('div', { class: 'big-count' }, el('b', { 'data-count': 'answered' }), ' ענו עד עכשיו'));
+        return;
+      }
+
+      if (s.phase === 'results' && s.question && s.results) {
+        const chart = el('div');
+        body.replaceChildren(
+          el('div', { class: 'counter' }, questionCounter(s)),
+          el('p', { class: 's-question compact' }, s.question.text),
+          s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
+          chart,
+          el('div', { class: 'big-count', style: 'margin-top:2vh' }, 'סה״כ ', el('b', {}, s.results.total), ' תשובות'));
+        renderBars(chart, s.results, s.question.type);
+        return;
+      }
+
+      if (s.phase === 'end') {
+        body.replaceChildren(el('div', { class: 'center' },
+          el('div', { class: 'emoji' }, '🎉'),
+          el('h1', {}, 'תודה רבה לכולם!')));
+        return;
+      }
+
+      // Lobby
+      const qr = el('div', { class: 'qr-box' });
+      body.replaceChildren(el('div', { class: 'lobby' },
+        el('div', {},
+          el('h1', {}, 'מה דעתכם?'),
+          el('p', { class: 'explanation' }, 'סרקו את הקוד, הזינו את השם שלכם וחכו לשאלה הראשונה.'),
+          el('div', { class: 'big-count' }, el('b', { 'data-count': 'players' }), ' משתתפים הצטרפו')),
+        el('div', {}, qr, el('div', { class: 'join-url' }, joinUrl))));
+      renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.3, window.innerHeight * 0.5)));
+    }
+
+    startPolling(async () => apply(await api('screen')), err => {
+      $('status').textContent = err ? err.message : '';
+      $('status').className = 'status' + (err ? ' error' : '');
+    });
+  </script>
+</body>
+</html>

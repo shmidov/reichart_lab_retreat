@@ -20,3 +20,6 @@ dist/
 # Editors
 .vscode/
 .idea/
+
+# Local Claude Code preview config
+.claude/

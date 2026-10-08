@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ריטריט המעבדה</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="wrap">
+    <div class="brand">ריטריט מעבדת רייכרט</div>
+
+    <section id="join" class="card" hidden>
+      <h1>ברוכים הבאים!</h1>
+      <form id="join-form">
+        <label>איך קוראים לך?
+          <input type="text" id="name-input" maxlength="40" autocomplete="name" required>
+        </label>
+        <button class="primary big" type="submit">הצטרפות</button>
+      </form>
+    </section>
+
+    <section id="game" hidden>
+      <div class="who">משתתף/ת בתור <b id="me"></b><button class="link" id="rename" type="button">החלפת שם</button></div>
+      <div id="view" class="card"></div>
+    </section>
+
+    <p id="status" class="status"></p>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    let playerId = storage.get('playerId');
+    if (!playerId) {
+      playerId = window.crypto && crypto.randomUUID
+        ? crypto.randomUUID()
+        : Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12);
+      storage.set('playerId', playerId);
+    }
+    let name = storage.get('name');
+    let state = null;
+    let stopPolling = null;
+
+    const $ = id => document.getElementById(id);
+    const view = $('view');
+
+    function setStatus(err) {
+      $('status').textContent = err ? err.message : '';
+      $('status').className = 'status' + (err ? ' error' : '');
+    }
+
+    function showJoin() {
+      $('game').hidden = true;
+      $('join').hidden = false;
+      $('name-input').value = name || '';
+      $('name-input').focus();
+    }
+
+    async function join(newName) {
+      const data = await api('join', { playerId, name: newName });
+      name = newName;
+      storage.set('name', name);
+      $('me').textContent = name;
+      $('join').hidden = true;
+      $('game').hidden = false;
+      applyState(data, true);
+      if (!stopPolling) {
+        stopPolling = startPolling(async () => applyState(await api('state')), setStatus);
+      }
+    }
+
+    $('join-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const value = $('name-input').value.trim();
+      if (!value) return;
+      const btn = e.submitter || $('join-form').querySelector('button');
+      btn.disabled = true;
+      try {
+        await join(value);
+        setStatus(null);
+      } catch (err) {
+        setStatus(err);
+      } finally {
+        btn.disabled = false;
+      }
+    });
+
+    $('rename').addEventListener('click', showJoin);
+
+    function applyState(next, force) {
+      if (!force && state && next.rev === state.rev) return;
+      state = next;
+      render();
+    }
+
+    // ---------- answering ----------
+
+    const answerKey = round => 'answer:' + round;
+    let sending = false;
+    let pending = null;
+
+    async function choose(option) {
+      const round = state.round;
+      storage.set(answerKey(round), option);
+      markSelected(option);
+      pending = { round, option };
+      if (sending) return;
+      sending = true;
+      setNote('שומר…');
+      while (pending) {
+        const p = pending;
+        pending = null;
+        try {
+          await api('answer', { playerId, name, round: p.round, answer: p.option });
+          if (!pending) setNote('נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה', 'ok');
+        } catch (err) {
+          if (storage.get(answerKey(p.round)) === p.option) storage.remove(answerKey(p.round));
+          if (!pending) { markSelected(null); setNote(err.message, 'error'); }
+        }
+      }
+      sending = false;
+    }
+
+    function markSelected(option) {
+      view.querySelectorAll('.option').forEach(b => {
+        b.classList.toggle('selected', b.dataset.value === option);
+        b.setAttribute('aria-pressed', b.dataset.value === option ? 'true' : 'false');
+      });
+    }
+
+    function setNote(text, kind) {
+      const note = view.querySelector('.note');
+      if (!note) return;
+      note.textContent = text;
+      note.className = 'note' + (kind ? ' ' + kind : '');
+    }
+
+    // ---------- rendering ----------
+
+    function render() {
+      const s = state;
+      if (s.phase === 'open' && s.question) return renderQuestion(s);
+
+      if (s.phase === 'results' && s.question) {
+        const mine = storage.get(answerKey(s.round));
+        view.replaceChildren(
+          el('div', { class: 'counter' }, questionCounter(s)),
+          el('h2', {}, s.question.text),
+          el('div', { class: 'center', style: 'margin-top:18px' },
+            el('div', { class: 'emoji' }, '👀'),
+            el('p', {}, 'התשובות ננעלו. הסתכלו על המסך הגדול!'),
+            el('p', { class: 'muted' }, mine ? 'ענית: ' + mine : 'לא ענית על השאלה הזו.')));
+        return;
+      }
+
+      if (s.phase === 'end') {
+        view.replaceChildren(el('div', { class: 'center' },
+          el('div', { class: 'emoji' }, '🎉'),
+          el('h2', {}, 'תודה שהשתתפתם!')));
+        return;
+      }
+
+      view.replaceChildren(el('div', { class: 'center' },
+        el('div', { class: 'emoji' }, '☕'),
+        el('h2', {}, 'היי ' + name + '!'),
+        el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'מחכים שהמנחה יפתח את השאלה הבאה'))));
+    }
+
+    function renderQuestion(s) {
+      const q = s.question;
+      const selected = storage.get(answerKey(s.round));
+      const layout = q.type === 'scale' ? 'scale' : (q.options.length === 2 ? 'two' : '');
+      view.replaceChildren(
+        el('div', { class: 'counter' }, questionCounter(s)),
+        el('h2', {}, q.text),
+        q.explanation ? el('p', { class: 'explanation' }, q.explanation) : null,
+        el('div', { class: 'options ' + layout, role: 'group' },
+          q.options.map(opt => el('button', {
+            type: 'button',
+            class: 'option' + (opt === selected ? ' selected' : ''),
+            'data-value': opt,
+            'aria-pressed': opt === selected ? 'true' : 'false',
+            onclick: () => choose(opt),
+          }, opt))),
+        el('div', { class: 'note' }, selected ? 'נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה' : 'בחרו תשובה'));
+      if (selected) setNote('נשמר ✓ אפשר לשנות עד שהמנחה סוגר את השאלה', 'ok');
+    }
+
+    // ---------- start ----------
+
+    if (name) {
+      join(name).catch(err => { setStatus(err); showJoin(); });
+    } else {
+      showJoin();
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>לוח מנחה</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+  <main class="wrap" id="login-wrap">
+    <div class="brand">ריטריט מעבדת רייכרט · מנחה</div>
+    <section class="card">
+      <h1>כניסת מנחה</h1>
+      <form id="login-form">
+        <label>סיסמה
+          <input type="password" id="password" autocomplete="current-password" required>
+        </label>
+        <button class="primary big" type="submit">כניסה</button>
+      </form>
+    </section>
+    <p id="login-status" class="status"></p>
+  </main>
+
+  <main class="wrap wide" id="panel" hidden>
+    <div class="topbar">
+      <div class="brand" style="margin:0">ריטריט מעבדת רייכרט · לוח מנחה</div>
+      <div class="links">
+        <a href="screen.html" target="_blank" rel="noopener">פתיחת מסך התצוגה ↗</a>
+        <a href="./" target="_blank" rel="noopener">עמוד המשתתפים ↗</a>
+        <button class="link" id="logout" type="button">יציאה</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <span class="pill phase" id="phase-pill"></span>
+      <span class="pill">משתתפים: <b id="player-count">0</b></span>
+      <span class="pill" id="answered-pill" hidden>ענו: <b id="answered-count">0</b></span>
+    </div>
+
+    <div class="grid2">
+      <section class="card">
+        <h3>עכשיו</h3>
+        <div id="now"></div>
+      </section>
+      <section class="card">
+        <h3>הבאה בתור</h3>
+        <div id="next"></div>
+      </section>
+    </div>
+
+    <div class="controls">
+      <button class="primary" id="primary-btn" type="button"></button>
+      <button id="lobby-btn" type="button">חזרה ללובי</button>
+      <button id="end-btn" type="button">מסך סיום</button>
+    </div>
+    <p id="status" class="status" style="text-align:start"></p>
+
+    <section class="card">
+      <div class="card-head">
+        <h3 style="margin:0">משתתפים</h3>
+        <button class="danger" id="clear-players" type="button">ניקוי הרשימה</button>
+      </div>
+      <div class="chips" id="players"></div>
+      <div class="muted small">ירוק = כבר ענה/תה על השאלה הפתוחה.</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <h3 style="margin:0">כל השאלות</h3>
+        <button id="reload-questions" type="button">רענון מהגיליון</button>
+      </div>
+      <ul class="qlist" id="qlist"></ul>
+    </section>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="assets/common.js"></script>
+  <script>
+    const $ = id => document.getElementById(id);
+    let password = sessionStorage.getItem('hostPassword') || '';
+    let state = null;
+    let questions = [];
+    let busy = false;
+
+    const TYPE_LABELS = { scale: 'סולם', yesno: 'כן / לא', choice: 'בחירה' };
+
+    function hostApi(action, payload) {
+      return api(action, Object.assign({ password }, payload || {}));
+    }
+
+    function setStatus(err, target) {
+      const node = $(target || 'status');
+      node.textContent = err ? err.message : '';
+      node.className = 'status' + (err ? ' error' : '');
+    }
+
+    // ---------- login ----------
+
+    $('login-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      password = $('password').value;
+      try {
+        await start();
+      } catch (err) {
+        setStatus(err, 'login-status');
+      }
+    });
+
+    $('logout').addEventListener('click', () => {
+      sessionStorage.removeItem('hostPassword');
+      location.reload();
+    });
+
+    async function start() {
+      const s = await hostApi('host');
+      sessionStorage.setItem('hostPassword', password);
+      $('login-wrap').hidden = true;
+      $('panel').hidden = false;
+      await loadQuestions();
+      apply(s);
+      startPolling(async () => { if (!busy) apply(await hostApi('host')); }, err => { if (!busy) setStatus(err); });
+    }
+
+    async function loadQuestions() {
+      questions = await hostApi('questions');
+    }
+
+    // ---------- actions ----------
+
+    async function act(action, payload, confirmText) {
+      if (busy) return;
+      if (confirmText && !confirm(confirmText)) return;
+      busy = true;
+      setButtonsDisabled(true);
+      try {
+        apply(await hostApi(action, payload));
+        setStatus(null);
+      } catch (err) {
+        setStatus(err);
+      } finally {
+        busy = false;
+        setButtonsDisabled(false);
+      }
+    }
+
+    function setButtonsDisabled(disabled) {
+      document.querySelectorAll('#panel button').forEach(b => {
+        if (b.id !== 'logout') b.disabled = disabled;
+      });
+    }
+
+    function openQuestion(index) {
+      const warn = state && state.phase === 'open'
+        ? 'השאלה הפתוחה תיסגר והתשובות שלה יישמרו. להמשיך?'
+        : null;
+      act('open', { index }, warn);
+    }
+
+    function nextIndex() {
+      return state ? state.index + 1 : 0;
+    }
+
+    $('primary-btn').addEventListener('click', () => {
+      if (state.phase === 'open') return act('close');
+      if (nextIndex() < questions.length) return openQuestion(nextIndex());
+      act('end');
+    });
+    $('lobby-btn').addEventListener('click', () => act('lobby'));
+    $('end-btn').addEventListener('click', () => act('end', null, 'לעבור למסך הסיום?'));
+    $('clear-players').addEventListener('click', () =>
+      act('clearPlayers', null, 'לנקות את רשימת המשתתפים? (משתתפים מחוברים יופיעו שוב בפעם הבאה שירעננו)'));
+    $('reload-questions').addEventListener('click', async () => {
+      try {
+        await loadQuestions();
+        render();
+        setStatus(null);
+      } catch (err) {
+        setStatus(err);
+      }
+    });
+
+    // ---------- rendering ----------
+
+    function apply(next) {
+      state = next;
+      render();
+    }
+
+    function questionBlock(q, extra) {
+      return el('div', {},
+        el('div', { class: 'q-text' }, q.text),
+        q.explanation ? el('div', { class: 'explanation' }, q.explanation) : null,
+        el('div', { class: 'q-meta' }, (TYPE_LABELS[q.type] || q.type) + ': ',
+          q.type === 'scale'
+            ? el('bdi', { dir: 'ltr' }, q.options[0] + '–' + q.options[q.options.length - 1])
+            : q.options.join(' · ')),
+        extra || null);
+    }
+
+    function render() {
+      if (!state) return;
+      const s = state;
+      $('phase-pill').textContent = PHASE_LABELS[s.phase] || s.phase;
+      $('player-count').textContent = s.players.length;
+      $('answered-pill').hidden = s.phase !== 'open';
+      $('answered-count').textContent = s.answered.length + ' / ' + s.players.length;
+
+      // Now
+      const now = $('now');
+      if ((s.phase === 'open' || s.phase === 'results') && s.question) {
+        let extra = null;
+        if (s.phase === 'results' && s.results) {
+          extra = el('div', { class: 'host-bars' });
+          renderBars(extra, s.results, s.question.type);
+          extra.append(el('div', { class: 'muted small' }, 'סה״כ ' + s.results.total + ' תשובות'));
+        }
+        now.replaceChildren(el('div', { class: 'counter' }, questionCounter(s)), questionBlock(s.question, extra));
+      } else {
+        now.replaceChildren(el('div', { class: 'muted' },
+          s.phase === 'end' ? 'המשחק הסתיים (מסך הסיום מוצג).' : 'לובי: אין שאלה פתוחה.'));
+      }
+
+      // Next
+      const ni = nextIndex();
+      const nextQ = questions[ni];
+      $('next').replaceChildren(nextQ
+        ? el('div', {}, el('div', { class: 'counter' }, 'שאלה ' + (ni + 1) + ' מתוך ' + questions.length), questionBlock(nextQ))
+        : el('div', { class: 'muted' }, 'אין שאלות נוספות.'));
+
+      // Primary control
+      const primary = $('primary-btn');
+      if (s.phase === 'open') primary.textContent = 'סגירת השאלה והצגת התוצאות';
+      else if (nextQ) primary.textContent = 'פתיחת שאלה ' + (ni + 1) + ' ←';
+      else primary.textContent = 'מעבר למסך הסיום';
+      primary.hidden = s.phase === 'end' && !nextQ;
+
+      // Players
+      const answered = new Set(s.answered);
+      $('players').replaceChildren(...(s.players.length
+        ? s.players.map(p => el('span', { class: 'chip' + (answered.has(p) ? ' done' : '') }, p))
+        : [el('span', { class: 'muted' }, 'עוד אין משתתפים.')]));
+
+      // Question list
+      $('qlist').replaceChildren(...questions.map((q, i) => {
+        const isCurrent = i === s.index && (s.phase === 'open' || s.phase === 'results');
+        return el('li', { class: isCurrent ? 'current' : '' },
+          el('span', { class: 'qnum' }, i + 1),
+          el('div', { class: 'qbody' }, q.text,
+            el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
+          el('button', { type: 'button', onclick: () => openQuestion(i), disabled: busy }, 'פתיחה'));
+      }));
+    }
+
+    if (password) {
+      start().catch(err => {
+        sessionStorage.removeItem('hostPassword');
+        setStatus(err, 'login-status');
+      });
+    }
+  </script>
+</body>
+</html>
