@@ -21,7 +21,10 @@
       <h1>כניסת מנחה</h1>
       <form id="login-form">
         <label>סיסמה
-          <input type="password" id="password" autocomplete="current-password" required>
+          <!-- A masked text field rather than type="password": this isn't real security, and it keeps
+             browsers (e.g. Safari) from offering to save it. -->
+          <input type="text" id="host-code" class="masked" autocomplete="off" autocapitalize="off"
+                 autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true" required>
         </label>
         <button class="primary big" type="submit">כניסה</button>
       </form>
@@ -119,7 +122,9 @@
 
     $('login-form').addEventListener('submit', e => {
       e.preventDefault();
-      if (!tryLogin($('password').value)) {
+      const code = $('host-code').value;
+      $('host-code').value = ''; // nothing left in the field for a password manager to pick up
+      if (!tryLogin(code)) {
         $('login-status').textContent = 'סיסמה שגויה.';
         $('login-status').className = 'status error';
       }

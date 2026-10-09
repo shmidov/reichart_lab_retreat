@@ -132,6 +132,7 @@ input[type=text], input[type=password] {
   border-radius: var(--radius-sm);
   transition: border-color .15s, box-shadow .15s;
 }
+input.masked { -webkit-text-security: disc; text-security: disc; }
 input:focus { outline: none; border-color: var(--slate-soft); box-shadow: var(--focus); }
 
 button {
