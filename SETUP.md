@@ -104,3 +104,15 @@ cd dev && npm install
 ```bash
 node dev/bots.js http://localhost:8080 20
 ```
+
+## Updating the logo
+
+Replace `retreat_logo.pdf`, then regenerate the site's logo (a cropped, slate-colored vector):
+
+```bash
+pip install pymupdf
+```
+
+```bash
+python dev/logo_to_svg.py
+```
