@@ -14,7 +14,7 @@
 <body class="screen">
   <div class="stage">
     <header class="stage-top">
-      <div class="brand"><span class="brand-mark"></span><span data-game-title></span></div>
+      <div class="brand"><img class="logo-sm" src="assets/logo.svg" alt="Reichart Group Retreat"></div>
       <div class="screen-status">
         <span id="conn"></span>
         <span id="role"></span>
@@ -164,6 +164,7 @@
 
     function build(s) {
       const activity = activityById(s.activity);
+      document.body.classList.toggle('is-welcome', !activity);
       $('corner-qr').hidden = !(activity && activity.type === 'game' && s.phase === 'open');
 
       if (!activity) return buildWelcome();
@@ -174,7 +175,8 @@
     function buildWelcome() {
       scene(el('div', { class: 'lobby' },
         el('div', {},
-          el('h1', {}, WELCOME.title),
+          el('img', { class: 'logo-lg', src: 'assets/logo.svg', alt: 'Reichart Group Retreat' }),
+          el('h1', { class: 'welcome-title' }, WELCOME.title),
           WELCOME.subtitle ? el('p', { class: 'lead' }, WELCOME.subtitle) : null),
         joinPanel('סרקו כדי להיכנס')));
     }

@@ -13,7 +13,7 @@
 <body>
   <main class="wrap">
     <header class="appbar">
-      <div class="brand"><span class="brand-mark"></span><span data-game-title></span></div>
+      <div class="brand"><img class="logo-sm" src="assets/logo.svg" alt="Reichart Group Retreat"></div>
       <span class="live off" id="live">מתחבר…</span>
     </header>
 
@@ -176,15 +176,19 @@
         pending = null;
       }
 
-      if (inGame && (!name || renaming)) return showJoin(activity);
+      if (inGame && (!name || renaming)) {
+        document.body.classList.remove('is-welcome');
+        return showJoin(activity);
+      }
       $('join').hidden = true;
       $('main').hidden = false;
       $('me').textContent = name || '';
       $('who').hidden = !inGame;
 
+      document.body.classList.toggle('is-welcome', !activity);
       if (!activity) {
         return show(el('div', { class: 'center' },
-          el('div', { class: 'breath' }),
+          el('img', { class: 'logo-lg', src: 'assets/logo.svg', alt: 'Reichart Group Retreat' }),
           el('h2', { class: 'q-title' }, WELCOME.title),
           WELCOME.subtitle ? el('p', { class: 'muted' }, WELCOME.subtitle) : null));
       }
