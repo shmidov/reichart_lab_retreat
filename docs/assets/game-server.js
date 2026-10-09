@@ -13,7 +13,9 @@
 const HEARTBEAT_MS = 3000;
 const SERVER_ALIVE_MS = 10000;
 const COMMAND_MAX_AGE_MS = 60000;
-const PRESENCE_MS = 70000; // phones re-announce every 20s; anyone silent this long has left
+// Names not heard from for this long are from an earlier session (another day, a rehearsal) and are
+// forgotten when the projector starts. During the day nobody is dropped, however long their phone sleeps.
+const STALE_SESSION_MS = 12 * 60 * 60 * 1000;
 
 class GameServer {
   constructor(relay, serverId, epoch, onChange) {
@@ -36,7 +38,7 @@ class GameServer {
       results: null,
       questions: [],
       questionsError: null,
-      players: {}, // id -> name, for people with the site open right now
+      players: {}, // id -> name, everyone who joined in this session
       seen: {}, // id -> last time we heard from them
       answers: {}, // id -> {name, answer}, current round only
       submissions: {}, // activity id -> {player id: name}, for 'submit' activities
@@ -60,8 +62,7 @@ class GameServer {
 
   start() {
     this.relay.subscribe('in', msg => this.handle(msg));
-    this.prune(); // drop anyone remembered from an earlier session who isn't here any more
-    this.presenceTimer = setInterval(() => this.prune(), 15000);
+    this.forgetEarlierSessions();
     this.beat();
     this.heartbeatTimer = setInterval(() => this.beat(), HEARTBEAT_MS);
     this.publishNow();
@@ -71,7 +72,6 @@ class GameServer {
 
   stop() {
     clearInterval(this.heartbeatTimer);
-    clearInterval(this.presenceTimer);
     clearTimeout(this.publishTimer);
     clearTimeout(this.retryTimer);
     this.stopped = true;
@@ -114,10 +114,10 @@ class GameServer {
     return true;
   }
 
-  /** Removes people who haven't been heard from recently (closed the page, or left). */
-  prune() {
+  /** Forgets names left over from an earlier session (e.g. yesterday's rehearsal). */
+  forgetEarlierSessions() {
     const seen = this.g.seen || {};
-    const cutoff = Date.now() - PRESENCE_MS;
+    const cutoff = Date.now() - STALE_SESSION_MS;
     let changed = false;
     Object.keys(this.g.players).forEach(id => {
       if ((seen[id] || 0) < cutoff) {

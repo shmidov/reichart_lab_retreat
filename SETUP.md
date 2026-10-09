@@ -27,8 +27,9 @@ until the host picks one, phones and the projector show the welcome screen. The 
 - **People are identified by their name.** The game and the writing activities ask for a name once; every
   name is recorded in the `Participants` tab. Entering a name that already exists (letter case doesn't
   matter) on any device continues as that person: their game answer, topics and links come back.
-- **The participant list shows who is here now**: phones check in every 20 seconds, and anyone not heard
-  from for about a minute drops off the list (their saved data stays).
+- **Nobody is dropped during the day**, however long their phone sleeps; re-entering the same name after a
+  disconnection simply continues. Names from an earlier session (not seen for 12+ hours, e.g. a rehearsal)
+  are forgotten when the projector starts, and **New game** on the host page clears the list.
 Switching away from the game in the middle of a question closes that question and saves it.
 
 Other settings in [`docs/config.js`](docs/config.js):
