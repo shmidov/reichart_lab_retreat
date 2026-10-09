@@ -23,3 +23,6 @@ dist/
 
 # Local Claude Code preview config
 .claude/
+
+# Office lock files
+~$*
