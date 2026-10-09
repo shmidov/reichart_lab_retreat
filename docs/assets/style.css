@@ -269,6 +269,12 @@ button.link { border: 0; background: none; padding: 0; min-height: 0; color: var
 .host-bars .bars { height: 170px; font-size: .88em; gap: 8px; }
 .card.now { border-top: 3px solid var(--sage); }
 
+.segmented { display: flex; flex-wrap: wrap; gap: 8px; }
+.seg { display: inline-flex; align-items: center; gap: 6px; }
+.seg.current { background: var(--slate); border-color: var(--slate); color: #fff; }
+.seg.current:hover:not(:disabled) { border-color: var(--slate); }
+.seg.current:disabled { opacity: 1; }
+
 .controls { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0; }
 .controls .primary { padding: 12px 24px; font-size: 1.04em; }
 
@@ -352,6 +358,8 @@ body.screen::after { left: 14vh; border-color: rgba(132, 153, 135, .16); }
   font-weight: 500;
 }
 .choices.ltr .choice { min-width: 2.4em; padding-inline: .5em; }
+
+.writing-text { font-size: 1.3em !important; line-height: 1.75; max-width: 46ch !important; margin-top: 1.5vh; color: var(--ink); }
 
 .discuss { margin-top: 3vh; color: var(--sage-ink); font-weight: 500; }
 

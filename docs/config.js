@@ -1,6 +1,26 @@
 window.APP_CONFIG = {
-  // The game's name, shown on every screen.
-  GAME_TITLE: 'שם למשחק',
+  // The site's name, shown in the header of every screen.
+  GAME_TITLE: 'שם לריטריט',
+
+  // What everyone sees until the host starts an activity (placeholder; to be designed).
+  WELCOME: {
+    title: 'ברוכים הבאים לריטריט',
+    subtitle: 'טקסט פתיחה זמני',
+  },
+
+  // The parts of the day the host can switch between, in order.
+  //   type 'game':    the opinion game (questions from the Google Sheet)
+  //   type 'writing': the projector shows the title and explanation; phones show the title only
+  ACTIVITIES: [
+    { id: 'game', type: 'game', name: 'משחק הדעות', title: 'שם למשחק' },
+    {
+      id: 'writing',
+      type: 'writing',
+      name: 'משימת כתיבה',
+      title: 'כותרת משימת הכתיבה',
+      explanation: 'הסבר מפורט על משימת הכתיבה. טקסט זמני שיוחלף בהמשך.\nאפשר לכתוב כאן כמה שורות.',
+    },
+  ],
 
   // Apps Script web-app URL (ends with /exec). Used only by the projector screen,
   // to load the questions and to save each question's answers. See SETUP.md.

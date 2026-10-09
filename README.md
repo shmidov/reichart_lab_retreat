@@ -1,5 +1,8 @@
 # Reichart Lab Retreat Game
 
+A small retreat website. The host switches the room between activities: a welcome screen, an opinion game
+and a writing task. Phones and the projector follow along.
+
 An opinion game in Hebrew for the lab retreat. There are no right answers: the host opens a question,
 everyone answers on their phone, and the group's answers appear as a bar chart.
 

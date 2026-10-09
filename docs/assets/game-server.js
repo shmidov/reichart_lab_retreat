@@ -1,9 +1,10 @@
-// The game itself. Runs inside the projector screen (screen.html) and keeps everything in memory
-// (mirrored to localStorage, so a page reload doesn't lose anything).
+// The retreat's live state. Runs inside the projector screen (screen.html) and keeps everything in memory
+// (mirrored to localStorage, so a page reload doesn't lose anything): which activity is on (welcome,
+// the opinion game, a writing task…) and, for the game, its questions, answers and results.
 //
 // Topics (all under reichart-retreat/<GAME_ID>/):
 //   in        players and host -> server: join, answer, cmd
-//   state     server -> everyone (retained): phase, current question, results, counts
+//   state     server -> everyone (retained): activity, game phase, current question, results, counts
 //   host      server -> host (retained): question list, player names, who answered, Sheet upload status
 //   server    server heartbeat (retained), so pages know the projector is alive
 //   p/<id>    server -> one player: answer acknowledgements
@@ -25,6 +26,7 @@ class GameServer {
     try { saved = JSON.parse(storage.get(this.storageKey) || 'null'); } catch (err) { /* corrupt: start fresh */ }
     this.g = Object.assign({
       rev: 0,
+      activity: 'welcome', // 'welcome' or an id from APP_CONFIG.ACTIVITIES
       phase: 'lobby',
       index: -1,
       round: 0,
@@ -45,7 +47,7 @@ class GameServer {
   /** Takes over from another projector: continue from the last published state (live answers are lost). */
   adopt(state, host) {
     if (!state) return;
-    ['phase', 'index', 'round', 'question', 'results'].forEach(k => { this.g[k] = state[k]; });
+    ['activity', 'phase', 'index', 'round', 'question', 'results'].forEach(k => { this.g[k] = state[k]; });
     this.g.rev = state.rev || 0;
     if (host && host.questions) this.g.questions = host.questions;
     this.g.answers = {};
@@ -114,6 +116,7 @@ class GameServer {
     if (msg.password !== window.APP_CONFIG.HOST_PASSWORD) return;
     if (Math.abs(Date.now() - (msg.t || 0)) > COMMAND_MAX_AGE_MS) return; // delayed/replayed
     switch (msg.cmd) {
+      case 'activity': return this.setActivity(String(msg.activity));
       case 'open': return this.open(Number(msg.index));
       case 'close': return this.close();
       case 'lobby': return this.idle('lobby');
@@ -122,6 +125,16 @@ class GameServer {
       case 'retryUploads': return this.processUploads();
       case 'resetGame': return this.reset();
     }
+  }
+
+  // ---------- activities ----------
+
+  /** Switches what everyone sees. Leaving the game closes (and saves) an open question first. */
+  setActivity(id) {
+    if (id !== 'welcome' && !activityById(id)) return;
+    if (this.g.phase === 'open') this.close(true);
+    this.g.activity = id;
+    this.publishNow();
   }
 
   // ---------- game flow ----------
@@ -214,6 +227,7 @@ class GameServer {
     const state = {
       epoch: g.epoch,
       rev: g.rev,
+      activity: g.activity || 'welcome',
       phase: g.phase,
       index: g.index,
       total: g.questions.length,

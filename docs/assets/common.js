@@ -53,6 +53,15 @@ function questionCounter(state) {
   return counterParts(state.index, state.total);
 }
 
+// ---------- activities ----------
+
+/** An activity from APP_CONFIG.ACTIVITIES by id (null for 'welcome' or unknown ids). */
+function activityById(id) {
+  return ((window.APP_CONFIG || {}).ACTIVITIES || []).find(a => a.id === id) || null;
+}
+
+const WELCOME = (window.APP_CONFIG || {}).WELCOME || { title: 'ברוכים הבאים', subtitle: '' };
+
 // ---------- the game's name ----------
 
 const GAME_TITLE = (window.APP_CONFIG || {}).GAME_TITLE || 'שם למשחק';

@@ -47,6 +47,13 @@
       <span class="pill" id="sheet-pill"></span>
     </div>
 
+    <section class="card">
+      <div class="eyebrow">מה מוצג עכשיו</div>
+      <div class="segmented" id="activities" role="group" aria-label="פעילות"></div>
+      <div id="activity-info"></div>
+    </section>
+
+    <div id="game-panel">
     <div class="grid2">
       <section class="card now">
         <div class="eyebrow">עכשיו</div>
@@ -80,6 +87,7 @@
       </div>
       <ul class="qlist" id="qlist"></ul>
     </section>
+    </div>
   </main>
 
   <script src="config.js"></script>
@@ -176,6 +184,44 @@
     $('reset-btn').addEventListener('click', () => send('resetGame', null,
       'להתחיל משחק חדש? רשימת המשתתפים תתאפס והמשחק יחזור ללובי. (מה שכבר נשמר בגיליון נשאר.)'));
 
+    // ---------- activities ----------
+
+    const ACTIVITY_CHOICES = [{ id: 'welcome', name: 'מסך פתיחה' }].concat(window.APP_CONFIG.ACTIVITIES || []);
+
+    function switchActivity(id) {
+      const leavingOpenQuestion = state && state.phase === 'open' && activityById(state.activity)
+        && activityById(state.activity).type === 'game' && id !== state.activity;
+      send('activity', { activity: id }, leavingOpenQuestion ? 'השאלה הפתוחה תיסגר והתשובות שלה יישמרו. להמשיך?' : null);
+    }
+
+    function renderActivities(s, busy, alive) {
+      const current = s ? s.activity || 'welcome' : null;
+      $('activities').replaceChildren(...ACTIVITY_CHOICES.map(a => el('button', {
+        type: 'button',
+        class: 'seg' + (a.id === current ? ' current' : ''),
+        'aria-pressed': a.id === current ? 'true' : 'false',
+        disabled: busy || !alive || !s,
+        onclick: () => switchActivity(a.id),
+      }, a.id === current ? icon('check', 16) : null, a.name)));
+
+      const activity = s ? activityById(current) : null;
+      $('game-panel').hidden = !(activity && activity.type === 'game');
+      if (!s) {
+        $('activity-info').replaceChildren();
+      } else if (!activity) {
+        $('activity-info').replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
+          'כולם רואים את מסך הפתיחה: ' + WELCOME.title));
+      } else if (activity.type === 'writing') {
+        setChildren($('activity-info'), el('div', { style: 'margin-top:16px' },
+          el('div', { class: 'q-text' }, activity.title),
+          activity.explanation ? el('div', { class: 'explanation' }, activity.explanation) : null,
+          el('div', { class: 'q-meta' }, 'במסך התצוגה: הכותרת וההסבר. בטלפונים: הכותרת בלבד.')));
+      } else {
+        $('activity-info').replaceChildren();
+      }
+      return activity;
+    }
+
     // ---------- rendering ----------
 
     function questionBlock(q, extra) {
@@ -219,11 +265,13 @@
         if (b.id !== 'logout') b.disabled = busy || !alive || !state;
       });
 
+      const activity = renderActivities(state, busy, alive);
+
       if (!state) {
         renderedNowKey = null;
         $('phase-pill').textContent = 'מחכה למסך התצוגה…';
         $('now').replaceChildren(el('div', { class: 'muted' },
-          'פתחו את מסך התצוגה (screen.html) במחשב שמחובר למקרן. המשחק עצמו רץ שם.'));
+          'פתחו את מסך התצוגה (screen.html) במחשב שמחובר למקרן. האתר כולו רץ משם.'));
         $('next').replaceChildren();
         $('primary-btn').textContent = '…';
         return;
@@ -233,9 +281,11 @@
       const qs = questions();
       const players = host ? host.players : [];
       const answered = host ? host.answered : [];
-      $('phase-pill').textContent = PHASE_LABELS[s.phase] || s.phase;
+      const inGame = !!activity && activity.type === 'game';
+      $('phase-pill').textContent = !activity ? 'מסך פתיחה'
+        : inGame ? activity.name + ' · ' + (PHASE_LABELS[s.phase] || s.phase) : activity.name;
       $('player-count').textContent = s.playerCount;
-      $('answered-pill').hidden = s.phase !== 'open';
+      $('answered-pill').hidden = !inGame || s.phase !== 'open';
       $('answered-count').textContent = s.answeredCount + ' / ' + s.playerCount;
 
       const sheet = $('sheet-pill');

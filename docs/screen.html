@@ -137,7 +137,7 @@
       if (!state) return;
       const s = state;
       // Only rebuild the page when something visible changed (answers only update the counter).
-      const key = [s.epoch, s.phase, s.round, s.index, s.total, s.results ? s.results.total : -1].join('|');
+      const key = [s.epoch, s.activity, s.phase, s.round, s.index, s.total, s.results ? s.results.total : -1].join('|');
       if (key !== renderedKey) {
         renderedKey = key;
         build(s);
@@ -150,8 +150,44 @@
       setChildren(body, el('div', { class: 'scene' }, children));
     }
 
+    /** The site's QR code inside the slate join panel (used by the welcome screen and the game lobby). */
+    function joinPanel(caption) {
+      const qr = el('div', { class: 'qr-box' });
+      const panel = el('div', { class: 'join-panel' },
+        el('div', { class: 'join-title' }, caption),
+        qr,
+        el('div', { class: 'join-url' }, joinUrl));
+      // Render after the panel is in the page.
+      setTimeout(() => renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.26, window.innerHeight * 0.46))));
+      return panel;
+    }
+
     function build(s) {
-      $('corner-qr').hidden = s.phase !== 'open';
+      const activity = activityById(s.activity);
+      $('corner-qr').hidden = !(activity && activity.type === 'game' && s.phase === 'open');
+
+      if (!activity) return buildWelcome();
+      if (activity.type === 'writing') return buildWriting(activity);
+      return buildGame(s, activity);
+    }
+
+    function buildWelcome() {
+      scene(el('div', { class: 'lobby' },
+        el('div', {},
+          el('h1', {}, WELCOME.title),
+          WELCOME.subtitle ? el('p', { class: 'lead' }, WELCOME.subtitle) : null),
+        joinPanel('סרקו כדי להיכנס')));
+    }
+
+    function buildWriting(activity) {
+      scene(
+        el('div', { class: 'eyebrow' }, activity.name),
+        el('p', { class: 's-question' }, activity.title),
+        activity.explanation ? el('p', { class: 'explanation writing-text' }, activity.explanation) : null);
+    }
+
+    function buildGame(s, activity) {
+      const gameTitle = activity.title || GAME_TITLE;
 
       if (s.phase === 'open' && s.question) {
         scene(
@@ -188,25 +224,20 @@
         scene(el('div', { class: 'finale' },
           el('div', { class: 'breath still' }),
           el('h1', {}, 'תודה רבה!'),
-          el('p', { class: 'muted' }, GAME_TITLE)));
+          el('p', { class: 'muted' }, gameTitle)));
         return;
       }
 
       // Lobby
-      const qr = el('div', { class: 'qr-box' });
       scene(el('div', { class: 'lobby' },
         el('div', {},
-          el('div', { class: 'eyebrow' }, 'ברוכים הבאים'),
-          el('h1', {}, GAME_TITLE),
+          el('div', { class: 'eyebrow' }, activity.name),
+          el('h1', {}, gameTitle),
           el('p', { class: 'lead' }, 'סרקו את הקוד, הזינו את השם שלכם וחכו לשאלה הראשונה.'),
           el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'players' }),
             el('span', {}, 'משתתפים הצטרפו'))),
-        el('div', { class: 'join-panel' },
-          el('div', { class: 'join-title' }, 'סרקו כדי להצטרף'),
-          qr,
-          el('div', { class: 'join-url' }, joinUrl))));
-      renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.26, window.innerHeight * 0.46)));
+        joinPanel('סרקו כדי להצטרף')));
     }
   </script>
 </body>

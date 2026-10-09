@@ -11,8 +11,19 @@
   memory, and the answers are saved to the Sheet in the background. If a save fails, the screen keeps
   retrying, and the host page shows the status ("גיליון: הכול נשמר ✓").
 
+The site has **activities** that the host switches between from the host page. Until the host picks one,
+phones and the projector show the welcome screen. The current activities are:
+- **The opinion game:** everything described here.
+- **A writing task:** the projector shows its title and explanation, and phones show only the title.
+  It is display only, with no storage.
+
+Players are asked for their name only when the game is on. Switching away from the game in the middle of a
+question closes that question and saves it.
+
 Settings are in [`docs/config.js`](docs/config.js):
-- `GAME_TITLE`: the game's name, shown on every screen (currently the placeholder "שם למשחק").
+- `WELCOME`: the welcome screen's texts.
+- `ACTIVITIES`: the activities, their names, and the writing task's title and explanation (all placeholders).
+- `GAME_TITLE`: the site's name, shown in every header (a placeholder for now).
 - `HOST_PASSWORD`: the host password. It only separates the host from the players.
 - `GAME_ID`: separates this game's messages from anyone else's on the public relays.
 - `API_URL`: the Apps Script URL.

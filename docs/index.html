@@ -18,8 +18,8 @@
     </header>
 
     <section id="join" class="card enter" hidden>
-      <div class="eyebrow">הצטרפות</div>
-      <h1>ברוכים הבאים</h1>
+      <div class="eyebrow" id="join-eyebrow">הצטרפות</div>
+      <h1>מה השם שלך?</h1>
       <p class="muted">רק שם, בלי סיסמה.</p>
       <form id="join-form">
         <label>איך קוראים לך?
@@ -29,9 +29,9 @@
       </form>
     </section>
 
-    <section id="game" hidden>
+    <section id="main">
       <div id="view" class="card"></div>
-      <div class="who">משתתף/ת בתור <b id="me"></b> · <button class="link" id="rename" type="button">החלפת שם</button></div>
+      <div class="who" id="who" hidden>משתתף/ת בתור <b id="me"></b> · <button class="link" id="rename" type="button">החלפת שם</button></div>
     </section>
 
     <p id="status" class="status"></p>
@@ -58,7 +58,8 @@
 
     relay.subscribe('state', s => {
       if (!isNewerState(s, state)) return;
-      const changed = !state || s.phase !== state.phase || s.round !== state.round || s.epoch !== state.epoch;
+      const changed = !state || s.activity !== state.activity || s.phase !== state.phase
+        || s.round !== state.round || s.epoch !== state.epoch;
       state = s;
       if (changed) render();
     });
@@ -92,19 +93,15 @@
     }
     setInterval(() => { if (name) sendJoin(); }, 20000); // presence, so a restarted screen re-learns everyone
 
-    function showJoin() {
-      $('game').hidden = true;
+    // The name is only needed for the game, so it's asked for when the game is on (or to change it).
+    let renaming = false;
+
+    function showJoin(activity) {
+      $('main').hidden = true;
       $('join').hidden = false;
+      $('join-eyebrow').textContent = activity.title || activity.name;
       $('name-input').value = name || '';
       $('name-input').focus();
-    }
-
-    function enterGame() {
-      $('me').textContent = name;
-      $('join').hidden = true;
-      $('game').hidden = false;
-      sendJoin();
-      render();
     }
 
     $('join-form').addEventListener('submit', e => {
@@ -113,10 +110,12 @@
       if (!value) return;
       name = value;
       storage.set('name', name);
-      enterGame();
+      renaming = false;
+      sendJoin();
+      render();
     });
 
-    $('rename').addEventListener('click', showJoin);
+    $('rename').addEventListener('click', () => { renaming = true; render(); });
 
     // ---------- answering ----------
 
@@ -169,16 +168,34 @@
     }
 
     function render() {
-      if ($('game').hidden) return;
       const s = state;
-      if (pending && (!s || s.phase !== 'open' || s.round !== pending.round)) {
+      const activity = s ? activityById(s.activity) : null;
+      const inGame = !!activity && activity.type === 'game';
+      if (pending && (!inGame || s.phase !== 'open' || s.round !== pending.round)) {
         clearTimeout(pending.timer);
         pending = null;
       }
 
-      if (s && s.phase === 'open' && s.question) return renderQuestion(s);
+      if (inGame && (!name || renaming)) return showJoin(activity);
+      $('join').hidden = true;
+      $('main').hidden = false;
+      $('me').textContent = name || '';
+      $('who').hidden = !inGame;
 
-      if (s && s.phase === 'results' && s.question) {
+      if (!activity) {
+        return show(el('div', { class: 'center' },
+          el('div', { class: 'breath' }),
+          el('h2', { class: 'q-title' }, WELCOME.title),
+          WELCOME.subtitle ? el('p', { class: 'muted' }, WELCOME.subtitle) : null));
+      }
+
+      if (activity.type === 'writing') {
+        return show(el('h2', { class: 'q-title', style: 'margin:0' }, activity.title));
+      }
+
+      if (s.phase === 'open' && s.question) return renderQuestion(s);
+
+      if (s.phase === 'results' && s.question) {
         const mine = storage.get(answerKey(s.round));
         show(
           el('div', { class: 'counter' }, questionCounter(s)),
@@ -190,7 +207,7 @@
         return;
       }
 
-      if (s && s.phase === 'end') {
+      if (s.phase === 'end') {
         show(el('div', { class: 'center' },
           el('div', { class: 'breath still' }),
           el('h2', {}, 'תודה שהשתתפתם!')));
@@ -224,8 +241,8 @@
 
     // ---------- start ----------
 
-    if (name) enterGame();
-    else showJoin();
+    if (name) sendJoin();
+    render();
   </script>
 </body>
 </html>
