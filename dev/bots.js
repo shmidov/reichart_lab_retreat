@@ -6,7 +6,7 @@
 //   node dev/bots.js http://localhost:8080 20
 //
 // The site URL is only used to read its config.js (game id and relays). Pointing this at the real
-// site adds the bots to the real game, so only do that for a rehearsal (then click "משחק חדש").
+// site adds the bots to the real game, so only do that for a rehearsal (then click "New game").
 
 const mqtt = require('mqtt');
 const vm = require('vm');
