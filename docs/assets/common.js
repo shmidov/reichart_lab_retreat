@@ -44,11 +44,9 @@ function setChildren(node, ...children) {
   node.replaceChildren(...children.flat().filter(c => c != null && c !== false));
 }
 
-const pad2 = n => String(n).padStart(2, '0');
-
-/** "שאלה 02 / 05", as children for el(). */
+/** "שאלה 2 מתוך 5", as children for el(). */
 function counterParts(index, total) {
-  return ['שאלה', el('span', { class: 'mono', dir: 'ltr' }, pad2(index + 1) + ' / ' + pad2(total))];
+  return 'שאלה ' + (index + 1) + ' מתוך ' + total;
 }
 
 function questionCounter(state) {
@@ -61,55 +59,26 @@ const GAME_TITLE = (window.APP_CONFIG || {}).GAME_TITLE || 'שם למשחק';
 document.querySelectorAll('[data-game-title]').forEach(node => { node.textContent = GAME_TITLE; });
 document.title = document.title ? GAME_TITLE + ' · ' + document.title : GAME_TITLE;
 
-// ---------- answer colors ----------
-
-const SPECTRUM = ['#8b7bff', '#5b9dff', '#38c8ff', '#3fe0c5', '#a6e86d', '#ffd166', '#ff9f6b', '#ff6f9f'];
-
-function mixHex(a, b, t) {
-  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16));
-  const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16));
-  return '#' + pa.map((v, i) => Math.round(v + (pb[i] - v) * t).toString(16).padStart(2, '0')).join('');
-}
-
-/** A color along the spectrum, t in [0, 1]. */
-function spectrumAt(t) {
-  const x = Math.min(Math.max(t, 0), 1) * (SPECTRUM.length - 1);
-  const i = Math.min(Math.floor(x), SPECTRUM.length - 2);
-  return mixHex(SPECTRUM[i], SPECTRUM[i + 1], x - i);
-}
-
-/** One color per answer, the same on the phones and in the chart. Scales run as a smooth gradient. */
-function answerColors(question) {
-  const n = question.options.length;
-  if (question.type === 'yesno') return ['#3fe0c5', '#ff6f9f'];
-  return question.options.map((_, i) => spectrumAt(n === 1 ? 0 : i / (n - 1)));
-}
-
-/** The answer options in their colors (projector): a gradient strip for scales, chips otherwise. */
+/** The answer options as quiet chips (projector), so the room sees what's being asked. */
 function optionsPreview(question) {
-  const colors = answerColors(question);
-  if (question.type === 'scale') {
-    return el('div', { class: 'scale-strip', dir: 'ltr' },
-      el('div', { class: 'strip', style: 'background:linear-gradient(90deg,' + colors.join(',') + ')' }),
-      el('div', { class: 'strip-ends' },
-        el('span', {}, question.options[0]),
-        el('span', {}, question.options[question.options.length - 1])));
-  }
-  return el('div', { class: 'choices' },
-    question.options.map((opt, i) => el('span', { class: 'choice', style: '--c:' + colors[i] }, opt)));
+  const ltr = question.type === 'scale';
+  return el('div', { class: 'choices' + (ltr ? ' ltr' : '') },
+    question.options.map(opt => el('span', { class: 'choice' }, opt)));
 }
 
 // ---------- chart ----------
 
-/** Vertical bar chart of {counts: [{label, count}], total}. Number scales read left-to-right. */
+/**
+ * Vertical bar chart of {counts: [{label, count}], total}. Number scales read left-to-right.
+ * All bars share one color, so no answer looks "right"; counts and percentages are always shown.
+ */
 function renderBars(container, results, question) {
-  const colors = answerColors(question);
   const max = Math.max(1, ...results.counts.map(c => c.count));
   const bars = [];
   const chart = el('div', { class: 'bars' + (question.type === 'scale' ? ' ltr' : '') },
-    results.counts.map((c, i) => {
+    results.counts.map(c => {
       const pct = results.total ? Math.round(c.count / results.total * 100) : 0;
-      const bar = el('div', { class: 'bar', style: '--c:' + colors[i] });
+      const bar = el('div', { class: 'bar' });
       bars.push([bar, c.count / max]);
       return el('div', { class: 'bar-col' },
         el('div', { class: 'bar-value' },
@@ -130,6 +99,7 @@ function renderBars(container, results, question) {
 const ICONS = {
   lock: '<path d="M7 11V8a5 5 0 0 1 10 0v3"/><rect x="4.5" y="11" width="15" height="10" rx="3"/>',
   check: '<path d="M5 12.5l4.2 4.2L19 7"/>',
+  chat: '<path d="M20 11.5a7.5 7.5 0 0 1-10.9 6.7L4.5 19.5l1.3-4.1A7.5 7.5 0 1 1 20 11.5z"/>',
 };
 
 function icon(name, size) {

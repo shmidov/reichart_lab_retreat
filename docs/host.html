@@ -7,7 +7,7 @@
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
@@ -70,7 +70,7 @@
         <button class="danger" id="reset-btn" type="button">משחק חדש</button>
       </div>
       <div class="chips" id="players"></div>
-      <div class="muted small">מודגש = כבר ענה/תה על השאלה הפתוחה.</div>
+      <div class="muted small">✓ כבר ענה/תה על השאלה הפתוחה.</div>
     </section>
 
     <section class="card">
@@ -272,7 +272,7 @@
       // Players
       const done = new Set(answered);
       $('players').replaceChildren(...(players.length
-        ? players.map(p => el('span', { class: 'chip' + (done.has(p) ? ' done' : '') }, p))
+        ? players.map(p => el('span', { class: 'chip' + (done.has(p) ? ' done' : '') }, done.has(p) ? icon('check', 14) : null, p))
         : [el('span', { class: 'muted' }, 'עוד אין משתתפים.')]));
 
       // Question list

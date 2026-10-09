@@ -6,7 +6,7 @@
   <title></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
@@ -51,7 +51,7 @@
     let state = null;
 
     const relay = new Relay(connected => {
-      $('live').textContent = connected ? 'LIVE' : 'מתחבר…';
+      $('live').textContent = connected ? 'מחובר' : 'מתחבר…';
       $('live').className = 'live' + (connected ? '' : ' off');
       if (connected && name) sendJoin(); // (re)announce ourselves after every reconnect
     });
@@ -184,7 +184,7 @@
           el('div', { class: 'counter' }, questionCounter(s)),
           el('h2', { class: 'q-title' }, s.question.text),
           el('div', { class: 'center', style: 'margin-top:26px' },
-            el('div', { class: 'icon-badge' }, icon('lock')),
+            el('div', { class: 'icon-badge' }, icon('chat')),
             el('p', {}, 'התשובות ננעלו. התוצאות על המסך הגדול.'),
             el('p', { class: 'muted' }, mine ? 'ענית: ' + mine : 'לא ענית על השאלה הזו.')));
         return;
@@ -192,13 +192,13 @@
 
       if (s && s.phase === 'end') {
         show(el('div', { class: 'center' },
-          el('div', { class: 'orb calm' }),
+          el('div', { class: 'breath still' }),
           el('h2', {}, 'תודה שהשתתפתם!')));
         return;
       }
 
       show(el('div', { class: 'center' },
-        el('div', { class: 'orb' }),
+        el('div', { class: 'breath' }),
         el('h2', {}, 'היי ' + name),
         el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'מחכים לשאלה הבאה'))));
     }
@@ -206,21 +206,19 @@
     function renderQuestion(s) {
       const q = s.question;
       const selected = storage.get(answerKey(s.round));
-      const colors = answerColors(q);
       const layout = q.type === 'scale' ? 'scale' : (q.options.length === 2 ? 'two' : '');
       show(
         el('div', { class: 'counter' }, questionCounter(s)),
         el('h2', { class: 'q-title' }, q.text),
         q.explanation ? el('p', { class: 'explanation' }, q.explanation) : null,
         el('div', { class: 'options ' + layout, role: 'group' },
-          q.options.map((opt, i) => el('button', {
+          q.options.map(opt => el('button', {
             type: 'button',
             class: 'option' + (opt === selected ? ' selected' : ''),
-            style: '--c:' + colors[i],
             'data-value': opt,
             'aria-pressed': opt === selected ? 'true' : 'false',
             onclick: () => choose(opt),
-          }, opt))),
+          }, el('span', { class: 'tick' }, icon('check', 18)), opt))),
         el('div', { class: 'note' + (selected ? ' ok' : '') }, selected ? SAVED_NOTE : 'בחרו תשובה'));
     }
 

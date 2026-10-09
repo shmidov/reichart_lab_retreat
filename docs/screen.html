@@ -6,7 +6,7 @@
   <title>מסך תצוגה</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+Hebrew:wght@300;400;500;600;700&family=Rubik:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -23,11 +23,11 @@
       </div>
     </header>
     <div class="stage-body" id="body">
-      <div class="center"><div class="orb"></div></div>
+      <div class="center"><div class="breath"></div></div>
     </div>
   </div>
   <div class="corner-qr" id="corner-qr" hidden>
-    <div class="qr-frame"><div class="qr-box" id="corner-qr-code"></div></div>
+    <div class="qr-box" id="corner-qr-code"></div>
     <div>להצטרפות</div>
   </div>
 
@@ -61,7 +61,7 @@
     const relay = new Relay((connected, total) => {
       $('conn').textContent = connected ? '' : 'אין חיבור, מנסה שוב…';
       $('conn').className = connected ? '' : 'status error';
-      $('live').textContent = connected ? 'LIVE' : 'מתחבר…';
+      $('live').textContent = connected ? 'מחובר' : 'מתחבר…';
       $('live').className = 'live' + (connected ? '' : ' off');
     });
 
@@ -146,11 +146,6 @@
       document.querySelectorAll('[data-count=answered]').forEach(n => { n.textContent = s.answeredCount; });
     }
 
-    function progress(s) {
-      return el('div', { class: 'progress' }, Array.from({ length: s.total }, (_, i) =>
-        el('span', { class: i < s.index ? 'done' : i === s.index ? 'now' : '' })));
-    }
-
     function scene(...children) {
       setChildren(body, el('div', { class: 'scene' }, children));
     }
@@ -160,37 +155,39 @@
 
       if (s.phase === 'open' && s.question) {
         scene(
-          progress(s),
+          el('div', { class: 'eyebrow' }, 'מה דעתכם?'),
           el('div', { class: 'counter' }, questionCounter(s)),
           el('p', { class: 's-question' }, s.question.text),
           s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
           optionsPreview(s.question),
           el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'answered' }),
-            el('span', {}, 'ענו מתוך'),
-            el('span', { class: 'mono', 'data-count': 'players' })));
+            el('span', {}, 'מתוך'),
+            el('span', { 'data-count': 'players' }),
+            el('span', {}, 'שיתפו את דעתם')));
         return;
       }
 
       if (s.phase === 'results' && s.question && s.results) {
         const chart = el('div');
         scene(
-          progress(s),
+          el('div', { class: 'eyebrow' }, 'בואו נראה מה חשבנו'),
           el('div', { class: 'counter' }, questionCounter(s)),
           el('p', { class: 's-question compact' }, s.question.text),
           s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
           chart,
           el('div', { class: 'meter small', style: 'margin-top:2.5vh' },
             el('span', { class: 'big' }, s.results.total),
-            el('span', {}, 'תשובות')));
+            el('span', {}, 'תשובות'),
+            el('span', { class: 'discuss', style: 'margin:0 1.2em 0 0' }, 'מה אפשר ללמוד מהתוצאות?')));
         renderBars(chart, s.results, s.question);
         return;
       }
 
       if (s.phase === 'end') {
         scene(el('div', { class: 'finale' },
-          el('div', { class: 'orb calm', style: 'width:140px;height:140px' }),
-          el('h1', { class: 'grad-text' }, 'תודה רבה!'),
+          el('div', { class: 'breath still' }),
+          el('h1', {}, 'תודה רבה!'),
           el('p', { class: 'muted' }, GAME_TITLE)));
         return;
       }
@@ -199,13 +196,16 @@
       const qr = el('div', { class: 'qr-box' });
       scene(el('div', { class: 'lobby' },
         el('div', {},
-          el('div', { class: 'eyebrow' }, 'סרקו כדי להצטרף'),
-          el('h1', { class: 'grad-text' }, GAME_TITLE),
+          el('div', { class: 'eyebrow' }, 'ברוכים הבאים'),
+          el('h1', {}, GAME_TITLE),
           el('p', { class: 'lead' }, 'סרקו את הקוד, הזינו את השם שלכם וחכו לשאלה הראשונה.'),
           el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'players' }),
             el('span', {}, 'משתתפים הצטרפו'))),
-        el('div', {}, el('div', { class: 'qr-frame' }, qr), el('div', { class: 'join-url' }, joinUrl))));
+        el('div', { class: 'join-panel' },
+          el('div', { class: 'join-title' }, 'סרקו כדי להצטרף'),
+          qr,
+          el('div', { class: 'join-url' }, joinUrl))));
       renderQr(qr, joinUrl, Math.round(Math.min(window.innerWidth * 0.26, window.innerHeight * 0.46)));
     }
   </script>
