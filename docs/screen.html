@@ -145,6 +145,7 @@
       document.querySelectorAll('[data-count=players]').forEach(n => { n.textContent = s.playerCount; });
       document.querySelectorAll('[data-count=answered]').forEach(n => { n.textContent = s.answeredCount; });
       document.querySelectorAll('[data-count=submitted]').forEach(n => { n.textContent = s.submittedCount || 0; });
+      document.querySelectorAll('[data-count=topics]').forEach(n => { n.textContent = s.topicsCount || 0; });
       document.querySelectorAll('[data-label=submitted]').forEach(n => {
         n.textContent = s.submittedCount === 1 ? 'link submitted' : 'links submitted';
       });
@@ -169,6 +170,7 @@
     function build(s) {
       const activity = activityById(s.activity);
       document.body.classList.toggle('is-welcome', !activity);
+      setAccent(activity);
       $('corner-qr').hidden = !(activity && (activity.type === 'submit' || (activity.type === 'game' && s.phase === 'open')));
 
       if (!activity) return buildWelcome();
@@ -196,10 +198,16 @@
       scene(
         el('div', { class: 'eyebrow' }, activity.name),
         el('p', { class: 's-question', dir: 'auto' }, activity.title),
-        activity.instructions ? el('p', { class: 'explanation writing-text', dir: 'auto' }, activity.instructions) : null,
-        el('div', { class: 'meter' },
-          el('span', { class: 'big', 'data-count': 'submitted' }),
-          el('span', { 'data-label': 'submitted' })));
+        activity.chooseTopics && activity.topicInstructions
+          ? el('p', { class: 'explanation writing-text', dir: 'auto' }, activity.topicInstructions)
+          : activity.instructions ? el('p', { class: 'explanation writing-text', dir: 'auto' }, activity.instructions) : null,
+        el('div', { class: 'meters' },
+          activity.chooseTopics ? el('div', { class: 'meter' },
+            el('span', { class: 'big', 'data-count': 'topics' }),
+            el('span', {}, 'chose their topics')) : null,
+          el('div', { class: 'meter' },
+            el('span', { class: 'big', 'data-count': 'submitted' }),
+            el('span', { 'data-label': 'submitted' }))));
     }
 
     function buildGame(s, activity) {

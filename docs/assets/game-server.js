@@ -1,10 +1,10 @@
 // The retreat's live state. Runs inside the projector screen (screen.html) and keeps everything in memory
 // (mirrored to localStorage, so a page reload doesn't lose anything): which activity is on (welcome,
-// a lecture, the opinion game, a link submission…), the game's questions, answers and results, and who
-// has submitted a link. (The links themselves go straight from the phones to the Google Sheet.)
+// a lecture, the opinion game, a link submission…), who is here, the game's questions, answers and results,
+// and who has chosen topics or submitted a link. (Those go straight from the phones to the Google Sheet.)
 //
 // Topics (all under reichart-retreat/<GAME_ID>/):
-//   in        players and host -> server: join, answer, cmd
+//   in        players and host -> server: join (also a presence ping), answer, topics, submitted, cmd
 //   state     server -> everyone (retained): activity, game phase, current question, results, counts
 //   host      server -> host (retained): question list, player names, who answered, Sheet upload status
 //   server    server heartbeat (retained), so pages know the projector is alive
@@ -13,6 +13,7 @@
 const HEARTBEAT_MS = 3000;
 const SERVER_ALIVE_MS = 10000;
 const COMMAND_MAX_AGE_MS = 60000;
+const PRESENCE_MS = 70000; // phones re-announce every 20s; anyone silent this long has left
 
 class GameServer {
   constructor(relay, serverId, epoch, onChange) {
@@ -35,9 +36,11 @@ class GameServer {
       results: null,
       questions: [],
       questionsError: null,
-      players: {}, // id -> name
+      players: {}, // id -> name, for people with the site open right now
+      seen: {}, // id -> last time we heard from them
       answers: {}, // id -> {name, answer}, current round only
       submissions: {}, // activity id -> {player id: name}, for 'submit' activities
+      topicChoices: {}, // activity id -> {player id: {name, topics}}, for activities with chooseTopics
       uploads: [], // closed questions waiting to be saved to the Sheet
       uploadError: null,
       savedCount: 0,
@@ -57,6 +60,8 @@ class GameServer {
 
   start() {
     this.relay.subscribe('in', msg => this.handle(msg));
+    this.prune(); // drop anyone remembered from an earlier session who isn't here any more
+    this.presenceTimer = setInterval(() => this.prune(), 15000);
     this.beat();
     this.heartbeatTimer = setInterval(() => this.beat(), HEARTBEAT_MS);
     this.publishNow();
@@ -66,6 +71,7 @@ class GameServer {
 
   stop() {
     clearInterval(this.heartbeatTimer);
+    clearInterval(this.presenceTimer);
     clearTimeout(this.publishTimer);
     clearTimeout(this.retryTimer);
     this.stopped = true;
@@ -85,6 +91,7 @@ class GameServer {
     if (msg.type === 'join') return this.join(msg);
     if (msg.type === 'answer') return this.answer(msg);
     if (msg.type === 'submitted') return this.submitted(msg);
+    if (msg.type === 'topics') return this.topics(msg);
     if (msg.type === 'cmd') return this.command(msg);
   }
 
@@ -94,11 +101,32 @@ class GameServer {
     if (!id || !name) return;
     const current = this.g.answers[id];
     this.relay.publish('p/' + id, { type: 'welcome', round: this.g.round, answer: current ? current.answer : null });
-    if (this.g.players[id] !== name) {
-      this.g.players[id] = name;
-      if (current) current.name = name;
-      this.schedulePublish();
-    }
+    if (current) current.name = name;
+    if (this.touch(id, name)) this.schedulePublish();
+  }
+
+  /** Marks a person as present. Returns true if the participant list changed. */
+  touch(id, name) {
+    this.g.seen = this.g.seen || {};
+    this.g.seen[id] = Date.now();
+    if (this.g.players[id] === name) return false;
+    this.g.players[id] = name;
+    return true;
+  }
+
+  /** Removes people who haven't been heard from recently (closed the page, or left). */
+  prune() {
+    const seen = this.g.seen || {};
+    const cutoff = Date.now() - PRESENCE_MS;
+    let changed = false;
+    Object.keys(this.g.players).forEach(id => {
+      if ((seen[id] || 0) < cutoff) {
+        delete this.g.players[id];
+        delete seen[id];
+        changed = true;
+      }
+    });
+    if (changed) this.schedulePublish();
   }
 
   answer(msg) {
@@ -109,7 +137,7 @@ class GameServer {
     const reply = extra => this.relay.publish('p/' + id, Object.assign({ round: msg.round, answer: msg.answer }, extra));
     if (this.g.phase !== 'open' || !q || msg.round !== this.g.round) return reply({ type: 'nack', error: 'This question is already closed.' });
     if (q.options.indexOf(msg.answer) === -1) return reply({ type: 'nack', error: 'Not a valid answer.' });
-    this.g.players[id] = name;
+    this.touch(id, name);
     this.g.answers[id] = { name, answer: msg.answer };
     reply({ type: 'ack' });
     this.schedulePublish();
@@ -123,7 +151,21 @@ class GameServer {
     if (!activity || activity.type !== 'submit' || !id || !name) return;
     const list = this.g.submissions[activity.id] = this.g.submissions[activity.id] || {};
     list[id] = name;
-    this.g.players[id] = name;
+    this.touch(id, name);
+    this.schedulePublish();
+  }
+
+  /** A phone saved its topic choices to the Sheet; keep them so the host can see who chose what. */
+  topics(msg) {
+    const activity = activityById(String(msg.activity));
+    const id = String(msg.id || '');
+    const name = cleanName(msg.name);
+    const topics = Array.isArray(msg.topics) ? msg.topics.map(String).slice(0, 10) : [];
+    if (!activity || !activity.chooseTopics || !id || !name || !topics.length) return;
+    this.g.topicChoices = this.g.topicChoices || {};
+    const list = this.g.topicChoices[activity.id] = this.g.topicChoices[activity.id] || {};
+    list[id] = { name, topics };
+    this.touch(id, name);
     this.schedulePublish();
   }
 
@@ -185,7 +227,7 @@ class GameServer {
   }
 
   reset() {
-    Object.assign(this.g, { phase: 'lobby', index: -1, question: null, results: null, players: {}, answers: {} });
+    Object.assign(this.g, { phase: 'lobby', index: -1, question: null, results: null, players: {}, seen: {}, answers: {} });
     this.publishNow();
   }
 
@@ -239,6 +281,8 @@ class GameServer {
     storage.set(this.storageKey, JSON.stringify(g));
 
     const showQuestion = g.phase === 'open' || g.phase === 'results';
+    const current = activityById(g.activity);
+    const choices = Object.values(((g.topicChoices || {})[g.activity]) || {});
     const state = {
       epoch: g.epoch,
       rev: g.rev,
@@ -252,6 +296,9 @@ class GameServer {
       playerCount: Object.keys(g.players).length,
       answeredCount: Object.keys(g.answers).length,
       submittedCount: Object.keys((g.submissions || {})[g.activity] || {}).length,
+      // Topic choice: the game's question titles are the topics.
+      topicOptions: current && current.chooseTopics ? g.questions.map(q => q.text) : null,
+      topicsCount: choices.length,
     };
     const byName = (a, b) => a.localeCompare(b, 'he');
     const host = {
@@ -262,6 +309,7 @@ class GameServer {
       players: Object.values(g.players).sort(byName),
       answered: Object.values(g.answers).map(a => a.name).sort(byName),
       submitted: Object.values((g.submissions || {})[g.activity] || {}).sort(byName),
+      topicChoices: choices.sort((a, b) => byName(a.name, b.name)),
       pendingUploads: g.uploads.length,
       uploadError: g.uploadError,
       savedCount: g.savedCount,

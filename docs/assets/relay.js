@@ -67,6 +67,11 @@ class Relay {
     this.clients.forEach(c => { if (c.connected) c.subscribe(this.prefix + suffix, { qos: 1 }); });
   }
 
+  unsubscribe(suffix) {
+    this.handlers.delete(suffix);
+    this.clients.forEach(c => { if (c.connected) c.unsubscribe(this.prefix + suffix); });
+  }
+
   publish(suffix, message, retain) {
     const payload = JSON.stringify(Object.assign({ mid: randomId() }, message));
     this.clients.forEach(c => c.publish(this.prefix + suffix, payload, { qos: 1, retain: !!retain }));

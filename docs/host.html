@@ -207,9 +207,11 @@
         'aria-pressed': a.id === current ? 'true' : 'false',
         disabled: busy || !alive || !s,
         onclick: () => switchActivity(a.id),
-      }, a.id === current ? icon('check', 16) : null, i ? i + '. ' : '', a.title)));
+      }, a.id === current ? icon('check', 16) : el('span', { class: 'dot', 'data-accent': a.accent || 'sand' }),
+        i ? i + '. ' : '', a.title)));
 
       const activity = s ? activityById(current) : null;
+      setAccent(activity);
       $('game-panel').hidden = !(activity && activity.type === 'game');
       const info = $('activity-info');
       if (!s) {
@@ -223,6 +225,8 @@
       } else if (activity.type === 'submit') {
         const names = (host && host.submitted) || [];
         setChildren(info, el('div', { style: 'margin-top:16px' },
+          activity.chooseTopics ? topicsPanel(activity) : null,
+          el('div', { class: 'eyebrow', style: 'margin-top:18px' }, 'Links'),
           el('div', { class: 'q-meta' },
             (activity.mode === 'group' ? 'Group' : 'Personal') + ' links, saved to the "' + activity.sheet + '" tab of the Sheet.'),
           el('div', { class: 'chips' }, names.length
@@ -233,6 +237,29 @@
         info.replaceChildren();
       }
       return activity;
+    }
+
+    /** Who chose which topics, and how popular each topic is (to help form the groups). */
+    function topicsPanel(activity) {
+      const choices = (host && host.topicChoices) || [];
+      const tally = new Map(questions().map(q => [q.text, []]));
+      choices.forEach(c => c.topics.forEach(t => { if (!tally.has(t)) tally.set(t, []); tally.get(t).push(c.name); }));
+      const byPopularity = [...tally.entries()].sort((a, b) => b[1].length - a[1].length);
+      return el('div', {},
+        el('div', { class: 'eyebrow' }, 'Topic choices'),
+        el('div', { class: 'q-meta' }, choices.length + (choices.length === 1 ? ' person has' : ' people have')
+          + ' chosen ' + activity.chooseTopics + ' topics (also saved to the "' + activity.topicsSheet + '" tab).'),
+        choices.length ? el('div', { class: 'table-wrap' }, el('table', { class: 'data' },
+          el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Topics'))),
+          el('tbody', {}, choices.map(c => el('tr', {},
+            el('td', { dir: 'auto' }, c.name),
+            el('td', {}, c.topics.map(t => el('span', { class: 'chip topic', dir: 'auto' }, t)))))))) : null,
+        choices.length ? el('div', { class: 'eyebrow', style: 'margin-top:18px' }, 'By topic') : null,
+        choices.length ? el('ul', { class: 'tally' }, byPopularity.map(([topic, people]) => el('li', {},
+          el('span', { class: 'tally-count' }, people.length),
+          el('div', {},
+            el('div', { dir: 'auto' }, topic),
+            people.length ? el('div', { class: 'q-meta', dir: 'auto' }, people.join(', ')) : null)))) : null);
     }
 
     // ---------- rendering ----------

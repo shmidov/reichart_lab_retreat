@@ -20,21 +20,20 @@
     <section id="join" class="card enter" hidden>
       <div class="eyebrow" id="join-eyebrow">Join</div>
       <h1>What's your name?</h1>
-      <p class="muted">Just a name, no password.</p>
+      <p class="muted">Just a name, no password. Use the same name all day; if you come back later, it picks up where you left off.</p>
       <form id="join-form">
         <label>Your name
           <input type="text" id="name-input" dir="auto" maxlength="40" autocomplete="name" required>
         </label>
-        <button class="primary big" type="submit">Join</button>
+        <button class="primary big" type="submit">Continue</button>
       </form>
+      <p id="join-status" class="note"></p>
     </section>
 
     <section id="main">
       <div id="view" class="card"></div>
-      <div class="who" id="who" hidden>Playing as <b id="me" dir="auto"></b> · <button class="link" id="rename" type="button">Change name</button></div>
+      <div class="who" id="who" hidden>Signed in as <b id="me" dir="auto"></b> · <button class="link" id="rename" type="button">Not you?</button></div>
     </section>
-
-    <p id="status" class="status"></p>
   </main>
 
   <script src="config.js"></script>
@@ -43,12 +42,16 @@
   <script>
     const $ = id => document.getElementById(id);
     const view = $('view');
+    const ACTIVITIES = window.APP_CONFIG.ACTIVITIES || [];
     const SAVED_NOTE = 'Saved ✓ You can change it until the question closes.';
+    const LINK_SAVED_NOTE = 'Saved ✓ You can update it at any time.';
 
-    let playerId = storage.get('playerId');
-    if (!playerId) { playerId = randomId(); storage.set('playerId', playerId); }
     let name = storage.get('name');
+    let playerId = name ? idForName(name) : null;
     let state = null;
+
+    // Everything saved per person on this device is keyed by their id (several people may share a device).
+    const key = (...parts) => [playerId].concat(parts).join(':');
 
     const relay = new Relay(connected => {
       $('live').textContent = connected ? 'Connected' : 'Connecting…';
@@ -59,15 +62,94 @@
     relay.subscribe('state', s => {
       if (!isNewerState(s, state)) return;
       const changed = !state || s.activity !== state.activity || s.phase !== state.phase
-        || s.round !== state.round || s.epoch !== state.epoch;
+        || s.round !== state.round || s.epoch !== state.epoch
+        || (s.topicOptions || []).length !== (state.topicOptions || []).length;
       state = s;
       if (changed) render();
     });
 
-    // Acknowledgements for this player only.
-    relay.subscribe('p/' + playerId, msg => {
+    // ---------- who you are ----------
+
+    function sendJoin() {
+      relay.publish('in', { type: 'join', id: playerId, name });
+    }
+    setInterval(() => { if (name) sendJoin(); }, 20000); // presence: the screen drops people it stops hearing from
+
+    function listenToMyChannel(previousId) {
+      if (previousId) relay.unsubscribe('p/' + previousId);
+      if (playerId) relay.subscribe('p/' + playerId, onPrivateMessage);
+    }
+
+    function setName(value) {
+      const previousId = playerId;
+      name = value;
+      playerId = idForName(name);
+      storage.set('name', name);
+      listenToMyChannel(previousId);
+      sendJoin();
+    }
+
+    /**
+     * Registers the name in the Sheet. If the name is known (any letter case), we get back its original
+     * spelling and what this person already chose or submitted, so they continue where they left off.
+     */
+    async function registerName(typed) {
+      const result = await api('join', {
+        name: typed,
+        topicSheets: ACTIVITIES.filter(a => a.chooseTopics).map(a => a.topicsSheet),
+        linkSheets: ACTIVITIES.filter(a => a.type === 'submit').map(a => a.sheet),
+      });
+      setName(result.name || typed);
+      ACTIVITIES.forEach(a => {
+        if (a.chooseTopics && result.topics && result.topics[a.topicsSheet]) {
+          storage.set(key('topics', a.id), JSON.stringify(result.topics[a.topicsSheet]));
+        }
+        if (a.type === 'submit' && result.links && result.links[a.sheet]) {
+          storage.set(key('link', a.id), result.links[a.sheet]);
+        }
+      });
+    }
+
+    let renaming = false;
+
+    function showJoin(activity) {
+      $('main').hidden = true;
+      $('join').hidden = false;
+      $('join-eyebrow').textContent = activity.title;
+      $('name-input').value = renaming ? '' : name || '';
+      $('join-status').textContent = '';
+      $('name-input').focus();
+    }
+
+    $('join-form').addEventListener('submit', async e => {
+      e.preventDefault();
+      const typed = cleanText($('name-input').value);
+      if (!typed) return;
+      const button = $('join-form').querySelector('button');
+      button.disabled = true;
+      $('join-status').className = 'note';
+      $('join-status').textContent = 'One moment…';
+      try {
+        await registerName(typed);
+      } catch (err) {
+        setName(typed); // the Sheet is unreachable: carry on, the name still works for the live parts
+      } finally {
+        button.disabled = false;
+      }
+      renaming = false;
+      render();
+    });
+
+    $('rename').addEventListener('click', () => { renaming = true; render(); });
+
+    // ---------- answering (game) ----------
+
+    const answerKey = round => key('answer', round, state && state.question ? state.question.id : '');
+    let pending = null; // {round, answer, tries, timer}: waiting for the screen to acknowledge
+
+    function onPrivateMessage(msg) {
       if (msg.type === 'welcome') {
-        // The server remembers our answer (e.g. after a reload or on another tab).
+        // The screen remembers our answer (after a reload, on another device, or after signing in again).
         if (msg.answer && state && msg.round === state.round) {
           storage.set(answerKey(msg.round), msg.answer);
           if (state.phase === 'open') { markSelected(msg.answer); setNote(SAVED_NOTE, 'ok'); }
@@ -84,47 +166,7 @@
         markSelected(null);
         setNote(msg.error || 'Could not save your answer.', 'error');
       }
-    });
-
-    // ---------- name ----------
-
-    function setName(value) {
-      name = value;
-      storage.set('name', name);
-      sendJoin();
     }
-
-    function sendJoin() {
-      relay.publish('in', { type: 'join', id: playerId, name });
-    }
-    setInterval(() => { if (name) sendJoin(); }, 20000); // presence, so a restarted screen re-learns everyone
-
-    // The game asks for a name before the first question (or to change it).
-    let renaming = false;
-
-    function showJoin(activity) {
-      $('main').hidden = true;
-      $('join').hidden = false;
-      $('join-eyebrow').textContent = activity.title;
-      $('name-input').value = name || '';
-      $('name-input').focus();
-    }
-
-    $('join-form').addEventListener('submit', e => {
-      e.preventDefault();
-      const value = cleanText($('name-input').value);
-      if (!value) return;
-      setName(value);
-      renaming = false;
-      render();
-    });
-
-    $('rename').addEventListener('click', () => { renaming = true; render(); });
-
-    // ---------- answering (game) ----------
-
-    const answerKey = round => 'answer:' + round + ':' + (state && state.question ? state.question.id : '');
-    let pending = null; // {round, answer, tries, timer}: waiting for the screen to acknowledge
 
     function choose(answer) {
       const round = state.round;
@@ -162,26 +204,78 @@
       note.className = 'note' + (kind ? ' ' + kind : '');
     }
 
+    // ---------- topics (before submitting a link) ----------
+
+    let changingTopics = false;
+
+    function savedTopics(activity) {
+      try { return JSON.parse(storage.get(key('topics', activity.id)) || 'null'); } catch (err) { return null; }
+    }
+
+    function renderTopicPicker(activity, options) {
+      const needed = activity.chooseTopics;
+      const chosen = new Set(savedTopics(activity) || []);
+      const header = [
+        el('div', { class: 'eyebrow' }, 'Step 1 of 2 · Choose topics'),
+        el('h2', { class: 'q-title', dir: 'auto' }, activity.title),
+        activity.topicInstructions ? el('p', { class: 'explanation', dir: 'auto' }, activity.topicInstructions) : null,
+      ];
+      if (!options || !options.length) {
+        return show(...header, el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'Loading the topics')));
+      }
+
+      const count = el('div', { class: 'pick-count' });
+      const save = el('button', { class: 'primary big', type: 'button' }, 'Save my topics');
+      const update = () => {
+        count.textContent = chosen.size + ' of ' + needed + ' chosen';
+        save.disabled = chosen.size !== needed;
+        list.querySelectorAll('.option').forEach(b => {
+          const on = chosen.has(b.dataset.value);
+          b.classList.toggle('selected', on);
+          b.setAttribute('aria-pressed', on ? 'true' : 'false');
+          b.disabled = !on && chosen.size >= needed;
+        });
+      };
+      const list = el('div', { class: 'options topics', role: 'group' }, options.map(topic => el('button', {
+        type: 'button',
+        class: 'option',
+        dir: 'auto',
+        'data-value': topic,
+        onclick: () => { chosen.has(topic) ? chosen.delete(topic) : chosen.add(topic); update(); },
+      }, el('span', { class: 'tick' }, icon('check', 18)), topic)));
+      save.addEventListener('click', async () => {
+        const topics = options.filter(t => chosen.has(t)); // keep the list order
+        save.disabled = true;
+        setNote('Saving…');
+        try {
+          await api('topics', { sheet: activity.topicsSheet, name, playerId, topics });
+          storage.set(key('topics', activity.id), JSON.stringify(topics));
+          relay.publish('in', { type: 'topics', activity: activity.id, id: playerId, name, topics });
+          changingTopics = false;
+          render();
+        } catch (err) {
+          setNote('Could not save: ' + err.message, 'error');
+          save.disabled = false;
+        }
+      });
+      show(...header, count, list, save, el('div', { class: 'note' }));
+      update();
+    }
+
     // ---------- link submission ----------
 
-    const submittedKey = activity => 'submitted:' + activity.id;
-
     async function submitLink(activity, form) {
-      const nameValue = cleanText(form.elements.person.value);
       const link = form.elements.link.value.trim();
-      if (!nameValue) return setNote('Please enter your name.', 'error');
       if (!/^https?:\/\/\S+$/i.test(link)) return setNote('Please paste a full link (starting with https://).', 'error');
-
       const button = form.querySelector('button');
       button.disabled = true;
       setNote('Saving…');
       try {
-        await api('submit', { sheet: activity.sheet, name: nameValue, link, playerId });
-        if (nameValue !== name) setName(nameValue);
-        storage.set(submittedKey(activity), link);
-        relay.publish('in', { type: 'submitted', activity: activity.id, id: playerId, name: nameValue });
+        await api('submit', { sheet: activity.sheet, name, link, playerId });
+        storage.set(key('link', activity.id), link);
+        relay.publish('in', { type: 'submitted', activity: activity.id, id: playerId, name });
         button.textContent = 'Update link';
-        setNote('Saved ✓ You can update it at any time.', 'ok');
+        setNote(LINK_SAVED_NOTE, 'ok');
       } catch (err) {
         setNote('Could not save: ' + err.message, 'error');
       } finally {
@@ -189,12 +283,13 @@
       }
     }
 
-    function renderSubmit(activity) {
-      const previous = storage.get(submittedKey(activity));
+    function renderSubmit(activity, s) {
+      const topics = activity.chooseTopics ? savedTopics(activity) : null;
+      if (activity.chooseTopics && (!topics || changingTopics)) return renderTopicPicker(activity, s.topicOptions);
+
+      const previous = storage.get(key('link', activity.id));
       const group = activity.mode === 'group';
       const form = el('form', { class: 'submit-form', novalidate: true },
-        el('label', {}, 'Your name',
-          el('input', { type: 'text', name: 'person', dir: 'auto', maxlength: 40, autocomplete: 'name', value: name || '' })),
         el('label', {}, group ? "Link to your group's Google Doc" : 'Link to your Google Doc',
           el('input', {
             type: 'url', name: 'link', dir: 'ltr', inputmode: 'url', autocomplete: 'off',
@@ -203,12 +298,15 @@
         el('button', { class: 'primary big', type: 'submit' }, previous ? 'Update link' : 'Save link'));
       form.addEventListener('submit', e => { e.preventDefault(); submitLink(activity, form); });
       show(
-        el('div', { class: 'eyebrow' }, group ? 'Group submission' : 'Personal submission'),
+        el('div', { class: 'eyebrow' }, activity.chooseTopics ? 'Step 2 of 2 · Submit' : group ? 'Group submission' : 'Personal submission'),
         el('h2', { class: 'q-title', dir: 'auto' }, activity.title),
+        topics ? el('div', { class: 'my-topics' },
+          el('div', { class: 'small muted' }, 'Your topics'),
+          el('ul', {}, topics.map(t => el('li', { dir: 'auto' }, t))),
+          el('button', { class: 'link small', type: 'button', onclick: () => { changingTopics = true; render(); } }, 'Change topics')) : null,
         activity.instructions ? el('p', { class: 'explanation', dir: 'auto' }, activity.instructions) : null,
         form,
-        el('div', { class: 'note' + (previous ? ' ok' : '') },
-          previous ? 'Saved ✓ You can update it at any time.' : ''));
+        el('div', { class: 'note' + (previous ? ' ok' : '') }, previous ? LINK_SAVED_NOTE : ''));
     }
 
     // ---------- rendering ----------
@@ -224,19 +322,20 @@
       const s = state;
       const activity = s ? activityById(s.activity) : null;
       const inGame = !!activity && activity.type === 'game';
+      setAccent(activity);
       if (pending && (!inGame || s.phase !== 'open' || s.round !== pending.round)) {
         clearTimeout(pending.timer);
         pending = null;
       }
 
-      if (inGame && (!name || renaming)) {
+      if (needsName(activity) && (!name || renaming)) {
         document.body.classList.remove('is-welcome');
         return showJoin(activity);
       }
       $('join').hidden = true;
       $('main').hidden = false;
       $('me').textContent = name || '';
-      $('who').hidden = !inGame;
+      $('who').hidden = !needsName(activity);
 
       document.body.classList.toggle('is-welcome', !activity);
       if (!activity) {
@@ -252,7 +351,7 @@
           el('h2', { class: 'q-title', dir: 'auto', style: 'margin:0' }, activity.title));
       }
 
-      if (activity.type === 'submit') return renderSubmit(activity);
+      if (activity.type === 'submit') return renderSubmit(activity, s);
 
       // The game
       if (s.phase === 'open' && s.question) return renderQuestion(s);
@@ -304,7 +403,12 @@
 
     // ---------- start ----------
 
-    if (name) sendJoin();
+    listenToMyChannel(null);
+    if (name) {
+      sendJoin();
+      // Refresh from the Sheet (e.g. links submitted from another device), then redraw.
+      registerName(name).then(render, () => { /* offline: keep going with what this device remembers */ });
+    }
     render();
   </script>
 </body>

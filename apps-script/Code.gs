@@ -5,15 +5,20 @@
  *   - action "questions": read the Questions tab (projector: on start, or on "reload" from the host)
  *   - action "save":      store one closed game question (projector, in the background after its chart)
  *   - action "submit":    store a participant's link for a writing activity (phones), in that activity's tab
+ *   - action "topics":    store a participant's topic choices for an activity (phones), in its topics tab
+ *   - action "join":      record a participant's name; if the name (any letter case) is known, return
+ *                         what they already chose/submitted, so they continue where they left off
  *
  * Lives in the Apps Script project of the game's Google Sheet (Extensions → Apps Script) and is deployed
  * as a web app (Execute as: Me, Who has access: Anyone). See SETUP.md.
  *
  * Tabs:
  *   Questions  edited by hand: id | question | explanation | type | options
+ *   Participants every name that joined (first and last time)
  *   Responses  one row per person per question
  *   Summary    one row per question
  *   <activity> one tab per link activity (e.g. "Future works"): one row per person (name, link)
+ *   <topics>   one tab per topic choice (e.g. "Blogpost topics"): one row per person (name, topics)
  */
 
 const QUESTIONS_SHEET = 'Questions';
@@ -25,7 +30,9 @@ const SUMMARY_HEADERS = ['question_id', 'question', 'type', 'total_responses', '
 
 const YES_NO = ['Yes', 'No'];
 const SUBMISSION_HEADERS = ['timestamp', 'name', 'link', 'player_id'];
-const RESERVED_SHEETS = [QUESTIONS_SHEET, RESPONSES_SHEET, SUMMARY_SHEET];
+const PARTICIPANTS_SHEET = 'Participants';
+const PARTICIPANT_HEADERS = ['name', 'first_joined', 'last_joined'];
+const RESERVED_SHEETS = [QUESTIONS_SHEET, RESPONSES_SHEET, SUMMARY_SHEET, PARTICIPANTS_SHEET];
 const MAX_SCALE_STEPS = 21;
 
 // ---------- HTTP entry points ----------
@@ -61,6 +68,8 @@ function route_(req) {
     case 'questions': return readQuestions_();
     case 'save': return withLock_(() => saveQuestion_(req));
     case 'submit': return withLock_(() => saveSubmission_(req));
+    case 'topics': return withLock_(() => saveTopics_(req));
+    case 'join': return withLock_(() => join_(req));
   }
   throw new Error('Unknown action: ' + req.action);
 }
@@ -104,26 +113,84 @@ function saveQuestion_(req) {
  * or same device) replaces their earlier row. Different people may submit the same link (group work).
  */
 function saveSubmission_(req) {
-  const sheetName = String(req.sheet || '').trim();
+  const link = String(req.link || '').trim();
+  if (!/^https?:\/\/\S+$/i.test(link) || link.length > 2000) throw new Error('Please paste a full link (https://…).');
+  upsertPersonRow_(req.sheet, SUBMISSION_HEADERS, req.name, req.playerId, [link]);
+  return { saved: true };
+}
+
+/**
+ * Records a name in Participants (names match regardless of letter case; the first spelling is kept) and
+ * returns what this person already saved: topics per topics tab, link per link tab.
+ */
+function join_(req) {
+  const typed = String(req.name || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  if (!typed) throw new Error('Please enter your name.');
+  const key = typed.toLowerCase();
+  const now = new Date();
+
+  const sheet = getOrCreateSheet_(PARTICIPANTS_SHEET, PARTICIPANT_HEADERS);
+  const values = sheet.getDataRange().getValues();
+  let name = typed;
+  const row = values.findIndex((r, i) => i > 0 && String(r[0]).trim().toLowerCase() === key);
+  if (row > 0) {
+    name = String(values[row][0]).trim();
+    sheet.getRange(row + 1, 3, 1, 1).setValues([[now]]);
+  } else {
+    sheet.getRange(Math.max(values.length, 1) + 1, 1, 1, 3).setValues([[typed, now, now]]);
+  }
+
+  const findRow = sheetName => {
+    if (!/^[A-Za-z0-9 _\-]{1,50}$/.test(String(sheetName)) || RESERVED_SHEETS.indexOf(sheetName) !== -1) return null;
+    const tab = getSpreadsheet_().getSheetByName(sheetName);
+    if (!tab) return null;
+    return tab.getDataRange().getValues().slice(1).find(r => String(r[1]).trim().toLowerCase() === key) || null;
+  };
+  const topics = {};
+  (req.topicSheets || []).forEach(sheetName => {
+    const r = findRow(sheetName);
+    if (r) topics[sheetName] = r.slice(2, -1).map(String).filter(Boolean);
+  });
+  const links = {};
+  (req.linkSheets || []).forEach(sheetName => {
+    const r = findRow(sheetName);
+    if (r && r[2]) links[sheetName] = String(r[2]);
+  });
+  return { name: name, topics: topics, links: links };
+}
+
+/** Stores a participant's chosen topics (one row per person; choosing again replaces it). */
+function saveTopics_(req) {
+  const topics = (Array.isArray(req.topics) ? req.topics : []).map(t => String(t).slice(0, 300)).slice(0, 10);
+  if (!topics.length) throw new Error('Please choose your topics.');
+  const headers = ['timestamp', 'name'].concat(topics.map((_, i) => 'topic_' + (i + 1)), ['player_id']);
+  upsertPersonRow_(req.sheet, headers, req.name, req.playerId, topics);
+  return { saved: true };
+}
+
+/**
+ * Writes one row per person into a tab: [time, name, ...values, player id]. A person's earlier row
+ * (same name, or same device) is replaced.
+ */
+function upsertPersonRow_(sheetNameRaw, headers, nameRaw, playerIdRaw, values) {
+  const sheetName = String(sheetNameRaw || '').trim();
   if (!/^[A-Za-z0-9 _\-]{1,50}$/.test(sheetName) || RESERVED_SHEETS.indexOf(sheetName) !== -1) {
     throw new Error('Invalid activity.');
   }
-  const name = String(req.name || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+  const name = String(nameRaw || '').trim().replace(/\s+/g, ' ').slice(0, 40);
   if (!name) throw new Error('Please enter your name.');
-  const link = String(req.link || '').trim();
-  if (!/^https?:\/\/\S+$/i.test(link) || link.length > 2000) throw new Error('Please paste a full link (https://…).');
-  const playerId = String(req.playerId || '').slice(0, 64);
+  const playerId = String(playerIdRaw || '').slice(0, 64);
 
-  const sheet = getOrCreateSheet_(sheetName, SUBMISSION_HEADERS);
-  const width = SUBMISSION_HEADERS.length;
+  const sheet = getOrCreateSheet_(sheetName, headers);
+  const width = headers.length;
+  const idCol = width - 1;
   const sameName = n => String(n).trim().toLowerCase() === name.toLowerCase();
   const kept = sheet.getDataRange().getValues().slice(1)
-    .filter(r => r.join('') !== '' && !sameName(r[1]) && !(playerId && String(r[3]) === playerId))
+    .filter(r => r.join('') !== '' && !sameName(r[1]) && !(playerId && String(r[idCol]) === playerId))
     .map(r => { const row = r.slice(0, width); while (row.length < width) row.push(''); return row; });
-  const rows = [SUBMISSION_HEADERS].concat(kept, [[new Date(), name, link, playerId]]);
+  const rows = [headers].concat(kept, [[new Date(), name].concat(values, [playerId])]);
   sheet.clearContents();
   sheet.getRange(1, 1, rows.length, width).setValues(rows);
-  return { saved: true };
 }
 
 // ---------- Questions ----------

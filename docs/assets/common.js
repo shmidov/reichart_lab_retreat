@@ -67,6 +67,32 @@ function activityById(id) {
 
 const WELCOME = (window.APP_CONFIG || {}).WELCOME || { title: 'Welcome', subtitle: '' };
 
+/** Colors the page with the current activity's palette accent (the welcome screen uses sand). */
+function setAccent(activity) {
+  document.body.dataset.accent = activity ? activity.accent || 'sage' : 'sand';
+}
+
+/** Activities that need to know who you are (and so ask for your name). */
+function needsName(activity) {
+  return !!activity && (activity.type === 'game' || activity.type === 'submit');
+}
+
+/**
+ * A person's id is derived from their name (ignoring letter case), so the same name on any device is the
+ * same participant, and everything they did is theirs again.
+ */
+function idForName(name) {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x01000193;
+  const s = String(name).trim().toLowerCase();
+  for (let i = 0; i < s.length; i++) {
+    const c = s.charCodeAt(i);
+    h1 = Math.imul(h1 ^ c, 16777619);
+    h2 = Math.imul(h2 ^ c, 2246822519);
+  }
+  return 'u' + (h1 >>> 0).toString(16).padStart(8, '0') + (h2 >>> 0).toString(16).padStart(8, '0');
+}
+
 // ---------- the site's name ----------
 
 const GAME_TITLE = (window.APP_CONFIG || {}).GAME_TITLE || 'Retreat';

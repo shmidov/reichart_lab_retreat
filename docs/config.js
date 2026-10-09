@@ -14,18 +14,35 @@ window.APP_CONFIG = {
   //   type 'submit':  phones submit a link (e.g. a Google Doc); saved to the Sheet tab named in `sheet`,
   //                   one row per person (resubmitting replaces that person's row).
   //                   mode 'personal' = everyone submits their own; 'group' = anyone may submit their group's.
+  //                   chooseTopics: N = first pick N topics (the game's question titles), saved to `topicsSheet`.
+  //   accent: the activity's palette color ('sage', 'terracotta', 'sand' or 'slate').
   ACTIVITIES: [
     {
       id: 'review',
       type: 'lecture',
       name: 'Lecture',
       title: 'The review process and its transformation',
+      accent: 'sage',
     },
     {
       id: 'game',
       type: 'game',
       name: 'Discussion game',
       title: 'Research identity, impact and publication in the AI era',
+      accent: 'slate',
+    },
+    {
+      id: 'blogpost',
+      type: 'submit',
+      mode: 'group',
+      name: 'Group writing',
+      title: 'Position blogpost',
+      chooseTopics: 3,
+      topicInstructions: 'Placeholder: choose the three topics you would most like to write about. We will form the groups from your choices.',
+      topicsSheet: 'Blogpost topics',
+      instructions: "Placeholder instructions: write your group's post in a Google Doc, set sharing to \"Anyone with the link\", and paste the link here. Anyone in the group can submit it.",
+      sheet: 'Position blogpost',
+      accent: 'terracotta',
     },
     {
       id: 'future',
@@ -35,15 +52,7 @@ window.APP_CONFIG = {
       title: 'Future works',
       instructions: 'Placeholder instructions: write your piece in a Google Doc, set sharing to "Anyone with the link", and paste the link here.',
       sheet: 'Future works',
-    },
-    {
-      id: 'blogpost',
-      type: 'submit',
-      mode: 'group',
-      name: 'Group writing',
-      title: 'Position blogpost',
-      instructions: "Placeholder instructions: write your group's post in a Google Doc, set sharing to \"Anyone with the link\", and paste the link here. Anyone in the group can submit it.",
-      sheet: 'Position blogpost',
+      accent: 'sand',
     },
   ],
 

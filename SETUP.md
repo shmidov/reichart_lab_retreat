@@ -10,8 +10,8 @@ until the host picks one, phones and the projector show the welcome screen. The 
 |---|---|---|---|
 | 1 | The review process and its transformation | `lecture` | The title, on the projector and on phones. |
 | 2 | Research identity, impact and publication in the AI era | `game` | The opinion game (below). |
-| 3 | Future works | `submit`, personal | Everyone pastes the link to their own Google Doc. |
-| 4 | Position blogpost | `submit`, group | Anyone pastes their group's link (the same link from several people is fine). |
+| 3 | Position blogpost | `submit`, group, topics first | Everyone first picks 3 topics (the game's question titles); the host sees the choices and forms groups (outside the site); then anyone pastes their group's link (the same link from several people is fine). |
+| 4 | Future works | `submit`, personal | Everyone pastes the link to their own Google Doc. |
 
 - **The projector screen (`screen.html`) runs the live site.** It keeps everything in memory (and in the
   laptop's browser storage, so a reload loses nothing).
@@ -20,15 +20,20 @@ until the host picks one, phones and the projector show the welcome screen. The 
 - **The game uses the Google Sheet only between questions.** The screen loads the questions when it starts,
   or when the host clicks **Reload from Sheet**. After each question, the bar chart is shown immediately from
   memory, and the answers are saved to the Sheet in the background (the host page shows "Sheet: all saved ✓").
-- **Links (activities 3 and 4) go straight from the phones to the Sheet**, each activity into its own tab
-  (`Future works`, `Position blogpost`), with the person's name and link. Submitting again replaces that
-  person's row, so people can fix a link. The projector and host page show who has submitted.
-
-The game asks for a name before its first question; the link forms ask for it too (prefilled if known).
+- **Topics and links (activities 3 and 4) go straight from the phones to the Sheet**: topic choices to
+  `Blogpost topics`, links to `Position blogpost` and `Future works`, one row per person (choosing or
+  submitting again replaces it). The host page shows who chose which topics (and a per-topic tally to help
+  form groups) and who has submitted; the projector shows the counts.
+- **People are identified by their name.** The game and the writing activities ask for a name once; every
+  name is recorded in the `Participants` tab. Entering a name that already exists (letter case doesn't
+  matter) on any device continues as that person: their game answer, topics and links come back.
+- **The participant list shows who is here now**: phones check in every 20 seconds, and anyone not heard
+  from for about a minute drops off the list (their saved data stays).
 Switching away from the game in the middle of a question closes that question and saves it.
 
 Other settings in [`docs/config.js`](docs/config.js):
 - `WELCOME`: the welcome screen's texts (placeholders).
+- Each activity's `accent`: its palette color (`sage`, `terracotta`, `sand`, `slate`).
 - `GAME_TITLE`: the site's name, used as the browser tab title.
 - `HOST_PASSWORD`: the host code. It only separates the host from the players.
 - `GAME_ID`: separates this site's messages from anyone else's on the public relays.
@@ -41,7 +46,8 @@ Other settings in [`docs/config.js`](docs/config.js):
 3. In the toolbar, select the function **`setup`** and click **Run**. Allow the permissions:
    *Advanced → Go to … (unsafe)*. This step is safe because the script is your own.
    This creates the tabs `Questions` (with sample questions), `Responses` and `Summary` at the bottom of the Sheet.
-   The link tabs (`Future works`, `Position blogpost`) are created automatically with the first submission.
+   The other tabs (`Participants`, `Blogpost topics`, `Position blogpost`, `Future works`) are created
+   automatically when first needed.
    The Execution log prints the Sheet's link.
 4. **Deploy → New deployment** → type **Web app**:
    - Execute as **Me**, and Who has access **Anyone**.
@@ -92,7 +98,9 @@ button to take over. Answers to a game question that is still open at that momen
 - `Responses`: one row per person per question (time, question, name, answer).
 - `Summary`: one row per question: the number of answers, the average (for scales), and the counts and
   percentages for each answer.
-- `Future works`, `Position blogpost`: one row per person (time, name, link).
+- `Participants`: every name that joined (first and last time).
+- `Blogpost topics`: one row per person (time, name, the chosen topics).
+- `Position blogpost`, `Future works`: one row per person (time, name, link).
 
 ## Local rehearsal
 
