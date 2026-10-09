@@ -1,29 +1,53 @@
 window.APP_CONFIG = {
-  // The site's name, shown in the header of every screen.
-  GAME_TITLE: 'שם לריטריט',
+  // The site's name (browser tab title).
+  GAME_TITLE: 'Reichart Group Retreat',
 
   // What everyone sees until the host starts an activity (placeholder; to be designed).
   WELCOME: {
-    title: 'ברוכים הבאים לריטריט',
-    subtitle: 'טקסט פתיחה זמני',
+    title: 'Welcome to the retreat',
+    subtitle: 'Placeholder welcome text',
   },
 
   // The parts of the day the host can switch between, in order.
+  //   type 'lecture': the title, on the projector and on phones
   //   type 'game':    the opinion game (questions from the Google Sheet)
-  //   type 'writing': the projector shows the title and explanation; phones show the title only
+  //   type 'submit':  phones submit a link (e.g. a Google Doc); saved to the Sheet tab named in `sheet`,
+  //                   one row per person (resubmitting replaces that person's row).
+  //                   mode 'personal' = everyone submits their own; 'group' = anyone may submit their group's.
   ACTIVITIES: [
-    { id: 'game', type: 'game', name: 'משחק הדעות', title: 'שם למשחק' },
     {
-      id: 'writing',
-      type: 'writing',
-      name: 'משימת כתיבה',
-      title: 'כותרת משימת הכתיבה',
-      explanation: 'הסבר מפורט על משימת הכתיבה. טקסט זמני שיוחלף בהמשך.\nאפשר לכתוב כאן כמה שורות.',
+      id: 'review',
+      type: 'lecture',
+      name: 'Lecture',
+      title: 'The review process and its transformation',
+    },
+    {
+      id: 'game',
+      type: 'game',
+      name: 'Discussion game',
+      title: 'Research identity, impact and publication in the AI era',
+    },
+    {
+      id: 'future',
+      type: 'submit',
+      mode: 'personal',
+      name: 'Personal writing',
+      title: 'Future works',
+      instructions: 'Placeholder instructions: write your piece in a Google Doc, set sharing to "Anyone with the link", and paste the link here.',
+      sheet: 'Future works',
+    },
+    {
+      id: 'blogpost',
+      type: 'submit',
+      mode: 'group',
+      name: 'Group writing',
+      title: 'Position blogpost',
+      instructions: "Placeholder instructions: write your group's post in a Google Doc, set sharing to \"Anyone with the link\", and paste the link here. Anyone in the group can submit it.",
+      sheet: 'Position blogpost',
     },
   ],
 
-  // Apps Script web-app URL (ends with /exec). Used only by the projector screen,
-  // to load the questions and to save each question's answers. See SETUP.md.
+  // Apps Script web-app URL (ends with /exec). See SETUP.md.
   API_URL: 'https://script.google.com/macros/s/AKfycbwbvGGEVrz3mSHzmiGxzTtpbA-H6bgYyh02rPnci9slc4SHDqDPvdwrkwC4dC9ma-o3/exec',
 
   // Separates this game's live messages from anyone else's on the public relays.

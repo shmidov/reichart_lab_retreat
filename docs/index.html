@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title></title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
@@ -14,24 +14,24 @@
   <main class="wrap">
     <header class="appbar">
       <div class="brand"><img class="logo-sm" src="assets/logo.svg" alt="Reichart Group Retreat"></div>
-      <span class="live off" id="live">מתחבר…</span>
+      <span class="live off" id="live">Connecting…</span>
     </header>
 
     <section id="join" class="card enter" hidden>
-      <div class="eyebrow" id="join-eyebrow">הצטרפות</div>
-      <h1>מה השם שלך?</h1>
-      <p class="muted">רק שם, בלי סיסמה.</p>
+      <div class="eyebrow" id="join-eyebrow">Join</div>
+      <h1>What's your name?</h1>
+      <p class="muted">Just a name, no password.</p>
       <form id="join-form">
-        <label>איך קוראים לך?
-          <input type="text" id="name-input" maxlength="40" autocomplete="name" required>
+        <label>Your name
+          <input type="text" id="name-input" dir="auto" maxlength="40" autocomplete="name" required>
         </label>
-        <button class="primary big" type="submit">הצטרפות</button>
+        <button class="primary big" type="submit">Join</button>
       </form>
     </section>
 
     <section id="main">
       <div id="view" class="card"></div>
-      <div class="who" id="who" hidden>משתתף/ת בתור <b id="me"></b> · <button class="link" id="rename" type="button">החלפת שם</button></div>
+      <div class="who" id="who" hidden>Playing as <b id="me" dir="auto"></b> · <button class="link" id="rename" type="button">Change name</button></div>
     </section>
 
     <p id="status" class="status"></p>
@@ -43,7 +43,7 @@
   <script>
     const $ = id => document.getElementById(id);
     const view = $('view');
-    const SAVED_NOTE = 'נשמר ✓ אפשר לשנות עד שהשאלה נסגרת';
+    const SAVED_NOTE = 'Saved ✓ You can change it until the question closes.';
 
     let playerId = storage.get('playerId');
     if (!playerId) { playerId = randomId(); storage.set('playerId', playerId); }
@@ -51,7 +51,7 @@
     let state = null;
 
     const relay = new Relay(connected => {
-      $('live').textContent = connected ? 'מחובר' : 'מתחבר…';
+      $('live').textContent = connected ? 'Connected' : 'Connecting…';
       $('live').className = 'live' + (connected ? '' : ' off');
       if (connected && name) sendJoin(); // (re)announce ourselves after every reconnect
     });
@@ -82,42 +82,46 @@
       } else {
         storage.remove(answerKey(msg.round));
         markSelected(null);
-        setNote(msg.error || 'השמירה נכשלה', 'error');
+        setNote(msg.error || 'Could not save your answer.', 'error');
       }
     });
 
-    // ---------- joining ----------
+    // ---------- name ----------
+
+    function setName(value) {
+      name = value;
+      storage.set('name', name);
+      sendJoin();
+    }
 
     function sendJoin() {
       relay.publish('in', { type: 'join', id: playerId, name });
     }
     setInterval(() => { if (name) sendJoin(); }, 20000); // presence, so a restarted screen re-learns everyone
 
-    // The name is only needed for the game, so it's asked for when the game is on (or to change it).
+    // The game asks for a name before the first question (or to change it).
     let renaming = false;
 
     function showJoin(activity) {
       $('main').hidden = true;
       $('join').hidden = false;
-      $('join-eyebrow').textContent = activity.title || activity.name;
+      $('join-eyebrow').textContent = activity.title;
       $('name-input').value = name || '';
       $('name-input').focus();
     }
 
     $('join-form').addEventListener('submit', e => {
       e.preventDefault();
-      const value = $('name-input').value.trim().replace(/\s+/g, ' ');
+      const value = cleanText($('name-input').value);
       if (!value) return;
-      name = value;
-      storage.set('name', name);
+      setName(value);
       renaming = false;
-      sendJoin();
       render();
     });
 
     $('rename').addEventListener('click', () => { renaming = true; render(); });
 
-    // ---------- answering ----------
+    // ---------- answering (game) ----------
 
     const answerKey = round => 'answer:' + round + ':' + (state && state.question ? state.question.id : '');
     let pending = null; // {round, answer, tries, timer}: waiting for the screen to acknowledge
@@ -134,12 +138,12 @@
     function sendAnswer() {
       if (!pending) return;
       if (pending.tries >= 6) {
-        setNote('המסך הראשי לא עונה. נסו לבחור שוב.', 'error');
+        setNote('The main screen is not responding. Please choose again.', 'error');
         pending = null;
         return;
       }
       pending.tries++;
-      setNote('שומר…');
+      setNote('Saving…');
       relay.publish('in', { type: 'answer', id: playerId, name, round: pending.round, answer: pending.answer });
       pending.timer = setTimeout(sendAnswer, 2500);
     }
@@ -156,6 +160,55 @@
       if (!note) return;
       note.textContent = text;
       note.className = 'note' + (kind ? ' ' + kind : '');
+    }
+
+    // ---------- link submission ----------
+
+    const submittedKey = activity => 'submitted:' + activity.id;
+
+    async function submitLink(activity, form) {
+      const nameValue = cleanText(form.elements.person.value);
+      const link = form.elements.link.value.trim();
+      if (!nameValue) return setNote('Please enter your name.', 'error');
+      if (!/^https?:\/\/\S+$/i.test(link)) return setNote('Please paste a full link (starting with https://).', 'error');
+
+      const button = form.querySelector('button');
+      button.disabled = true;
+      setNote('Saving…');
+      try {
+        await api('submit', { sheet: activity.sheet, name: nameValue, link, playerId });
+        if (nameValue !== name) setName(nameValue);
+        storage.set(submittedKey(activity), link);
+        relay.publish('in', { type: 'submitted', activity: activity.id, id: playerId, name: nameValue });
+        button.textContent = 'Update link';
+        setNote('Saved ✓ You can update it at any time.', 'ok');
+      } catch (err) {
+        setNote('Could not save: ' + err.message, 'error');
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    function renderSubmit(activity) {
+      const previous = storage.get(submittedKey(activity));
+      const group = activity.mode === 'group';
+      const form = el('form', { class: 'submit-form', novalidate: true },
+        el('label', {}, 'Your name',
+          el('input', { type: 'text', name: 'person', dir: 'auto', maxlength: 40, autocomplete: 'name', value: name || '' })),
+        el('label', {}, group ? "Link to your group's Google Doc" : 'Link to your Google Doc',
+          el('input', {
+            type: 'url', name: 'link', dir: 'ltr', inputmode: 'url', autocomplete: 'off',
+            placeholder: 'https://docs.google.com/…', value: previous || '',
+          })),
+        el('button', { class: 'primary big', type: 'submit' }, previous ? 'Update link' : 'Save link'));
+      form.addEventListener('submit', e => { e.preventDefault(); submitLink(activity, form); });
+      show(
+        el('div', { class: 'eyebrow' }, group ? 'Group submission' : 'Personal submission'),
+        el('h2', { class: 'q-title', dir: 'auto' }, activity.title),
+        activity.instructions ? el('p', { class: 'explanation', dir: 'auto' }, activity.instructions) : null,
+        form,
+        el('div', { class: 'note' + (previous ? ' ok' : '') },
+          previous ? 'Saved ✓ You can update it at any time.' : ''));
     }
 
     // ---------- rendering ----------
@@ -193,35 +246,40 @@
           WELCOME.subtitle ? el('p', { class: 'muted' }, WELCOME.subtitle) : null));
       }
 
-      if (activity.type === 'writing') {
-        return show(el('h2', { class: 'q-title', style: 'margin:0' }, activity.title));
+      if (activity.type === 'lecture') {
+        return show(
+          el('div', { class: 'eyebrow' }, activity.name),
+          el('h2', { class: 'q-title', dir: 'auto', style: 'margin:0' }, activity.title));
       }
 
+      if (activity.type === 'submit') return renderSubmit(activity);
+
+      // The game
       if (s.phase === 'open' && s.question) return renderQuestion(s);
 
       if (s.phase === 'results' && s.question) {
         const mine = storage.get(answerKey(s.round));
         show(
           el('div', { class: 'counter' }, questionCounter(s)),
-          el('h2', { class: 'q-title' }, s.question.text),
+          el('h2', { class: 'q-title', dir: 'auto' }, s.question.text),
           el('div', { class: 'center', style: 'margin-top:26px' },
             el('div', { class: 'icon-badge' }, icon('chat')),
-            el('p', {}, 'התשובות ננעלו. התוצאות על המסך הגדול.'),
-            el('p', { class: 'muted' }, mine ? 'ענית: ' + mine : 'לא ענית על השאלה הזו.')));
+            el('p', {}, 'Responses are closed. The results are on the big screen.'),
+            el('p', { class: 'muted' }, mine ? ['You answered: ', el('bdi', {}, mine)] : 'You did not answer this one.')));
         return;
       }
 
       if (s.phase === 'end') {
         show(el('div', { class: 'center' },
           el('div', { class: 'breath still' }),
-          el('h2', {}, 'תודה שהשתתפתם!')));
+          el('h2', {}, 'Thanks for taking part!')));
         return;
       }
 
       show(el('div', { class: 'center' },
         el('div', { class: 'breath' }),
-        el('h2', {}, 'היי ' + name),
-        el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'מחכים לשאלה הבאה'))));
+        el('h2', {}, 'Hi ', el('bdi', {}, name)),
+        el('p', { class: 'muted' }, el('span', { class: 'dots' }, 'Waiting for the next question'))));
     }
 
     function renderQuestion(s) {
@@ -230,17 +288,18 @@
       const layout = q.type === 'scale' ? 'scale' : (q.options.length === 2 ? 'two' : '');
       show(
         el('div', { class: 'counter' }, questionCounter(s)),
-        el('h2', { class: 'q-title' }, q.text),
-        q.explanation ? el('p', { class: 'explanation' }, q.explanation) : null,
+        el('h2', { class: 'q-title', dir: 'auto' }, q.text),
+        q.explanation ? el('p', { class: 'explanation', dir: 'auto' }, q.explanation) : null,
         el('div', { class: 'options ' + layout, role: 'group' },
           q.options.map(opt => el('button', {
             type: 'button',
             class: 'option' + (opt === selected ? ' selected' : ''),
             'data-value': opt,
+            dir: 'auto',
             'aria-pressed': opt === selected ? 'true' : 'false',
             onclick: () => choose(opt),
           }, el('span', { class: 'tick' }, icon('check', 18)), opt))),
-        el('div', { class: 'note' + (selected ? ' ok' : '') }, selected ? SAVED_NOTE : 'בחרו תשובה'));
+        el('div', { class: 'note' + (selected ? ' ok' : '') }, selected ? SAVED_NOTE : 'Choose the answer closest to your view.'));
     }
 
     // ---------- start ----------

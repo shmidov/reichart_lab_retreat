@@ -1,6 +1,7 @@
 // The retreat's live state. Runs inside the projector screen (screen.html) and keeps everything in memory
 // (mirrored to localStorage, so a page reload doesn't lose anything): which activity is on (welcome,
-// the opinion game, a writing task…) and, for the game, its questions, answers and results.
+// a lecture, the opinion game, a link submission…), the game's questions, answers and results, and who
+// has submitted a link. (The links themselves go straight from the phones to the Google Sheet.)
 //
 // Topics (all under reichart-retreat/<GAME_ID>/):
 //   in        players and host -> server: join, answer, cmd
@@ -36,6 +37,7 @@ class GameServer {
       questionsError: null,
       players: {}, // id -> name
       answers: {}, // id -> {name, answer}, current round only
+      submissions: {}, // activity id -> {player id: name}, for 'submit' activities
       uploads: [], // closed questions waiting to be saved to the Sheet
       uploadError: null,
       savedCount: 0,
@@ -82,6 +84,7 @@ class GameServer {
     if (msg.type === 'ping') return Date.now() - (this.lastBeat || 0) > 1000 && this.beat();
     if (msg.type === 'join') return this.join(msg);
     if (msg.type === 'answer') return this.answer(msg);
+    if (msg.type === 'submitted') return this.submitted(msg);
     if (msg.type === 'cmd') return this.command(msg);
   }
 
@@ -104,11 +107,23 @@ class GameServer {
     if (!id || !name) return;
     const q = this.g.question;
     const reply = extra => this.relay.publish('p/' + id, Object.assign({ round: msg.round, answer: msg.answer }, extra));
-    if (this.g.phase !== 'open' || !q || msg.round !== this.g.round) return reply({ type: 'nack', error: 'השאלה כבר נסגרה.' });
-    if (q.options.indexOf(msg.answer) === -1) return reply({ type: 'nack', error: 'תשובה לא חוקית.' });
+    if (this.g.phase !== 'open' || !q || msg.round !== this.g.round) return reply({ type: 'nack', error: 'This question is already closed.' });
+    if (q.options.indexOf(msg.answer) === -1) return reply({ type: 'nack', error: 'Not a valid answer.' });
     this.g.players[id] = name;
     this.g.answers[id] = { name, answer: msg.answer };
     reply({ type: 'ack' });
+    this.schedulePublish();
+  }
+
+  /** A phone saved a link to the Sheet; remember who, so the screens can show progress. */
+  submitted(msg) {
+    const activity = activityById(String(msg.activity));
+    const id = String(msg.id || '');
+    const name = cleanName(msg.name);
+    if (!activity || activity.type !== 'submit' || !id || !name) return;
+    const list = this.g.submissions[activity.id] = this.g.submissions[activity.id] || {};
+    list[id] = name;
+    this.g.players[id] = name;
     this.schedulePublish();
   }
 
@@ -236,6 +251,7 @@ class GameServer {
       results: g.phase === 'results' ? g.results : null,
       playerCount: Object.keys(g.players).length,
       answeredCount: Object.keys(g.answers).length,
+      submittedCount: Object.keys((g.submissions || {})[g.activity] || {}).length,
     };
     const byName = (a, b) => a.localeCompare(b, 'he');
     const host = {
@@ -245,6 +261,7 @@ class GameServer {
       questionsError: g.questionsError,
       players: Object.values(g.players).sort(byName),
       answered: Object.values(g.answers).map(a => a.name).sort(byName),
+      submitted: Object.values((g.submissions || {})[g.activity] || {}).sort(byName),
       pendingUploads: g.uploads.length,
       uploadError: g.uploadError,
       savedCount: g.savedCount,

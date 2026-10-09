@@ -25,7 +25,7 @@ async function main() {
   const prefix = 'reichart-retreat/' + config.GAME_ID + '/';
   console.log(`${count} bots joining game "${config.GAME_ID}" via ${config.BROKERS[0]}`);
 
-  const bots = Array.from({ length: count }, (_, i) => ({ id: 'bot' + rand(), name: 'בוט ' + (i + 1) }));
+  const bots = Array.from({ length: count }, (_, i) => ({ id: 'bot' + rand(), name: 'Bot ' + (i + 1) }));
   const client = mqtt.connect(config.BROKERS[0], { clientId: 'rlr-bots-' + rand() });
   const publish = (suffix, msg) =>
     client.publish(prefix + suffix, JSON.stringify(Object.assign({ mid: rand() }, msg)), { qos: 1 });

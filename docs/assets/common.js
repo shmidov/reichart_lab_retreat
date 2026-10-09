@@ -1,17 +1,17 @@
 // Shared helpers for the player, host and screen pages.
 
-/** Calls the Apps Script backend (Google Sheet). Only the projector screen uses this. */
+/** Calls the Apps Script backend (Google Sheet): the projector for questions/results, phones for link submissions. */
 async function api(action, payload) {
   const url = (window.APP_CONFIG || {}).API_URL || '';
-  if (!url || url.indexOf('PASTE_') === 0) throw new Error('יש להגדיר את API_URL בקובץ config.js');
+  if (!url || url.indexOf('PASTE_') === 0) throw new Error('API_URL is not set in config.js');
   // text/plain body keeps this a "simple" request, so Apps Script doesn't need CORS preflight.
   const res = await fetch(url, {
     method: 'POST',
     body: JSON.stringify(Object.assign({ action: action }, payload || {})),
   });
-  if (!res.ok) throw new Error('שגיאת שרת (' + res.status + ')');
+  if (!res.ok) throw new Error('Server error (' + res.status + ')');
   const json = await res.json();
-  if (!json.ok) throw new Error(json.error || 'שגיאה לא ידועה');
+  if (!json.ok) throw new Error(json.error || 'Unknown error');
   return json.data;
 }
 
@@ -37,16 +37,21 @@ const storage = {
   remove(key) { try { localStorage.removeItem(key); } catch (e) { /* private mode */ } },
 };
 
-const PHASE_LABELS = { lobby: 'לובי', open: 'שאלה פתוחה', results: 'תוצאות', end: 'סיום' };
+const PHASE_LABELS = { lobby: 'Lobby', open: 'Question open', results: 'Results', end: 'Finished' };
+
+/** Trims and collapses whitespace in a name typed by a person. */
+function cleanText(value) {
+  return String(value || '').trim().replace(/\s+/g, ' ').slice(0, 40);
+}
 
 /** Like node.replaceChildren, but skips null/false (e.g. a question without an explanation). */
 function setChildren(node, ...children) {
   node.replaceChildren(...children.flat().filter(c => c != null && c !== false));
 }
 
-/** "שאלה 2 מתוך 5", as children for el(). */
+/** "Question 2 of 5". */
 function counterParts(index, total) {
-  return 'שאלה ' + (index + 1) + ' מתוך ' + total;
+  return 'Question ' + (index + 1) + ' of ' + total;
 }
 
 function questionCounter(state) {
@@ -60,11 +65,11 @@ function activityById(id) {
   return ((window.APP_CONFIG || {}).ACTIVITIES || []).find(a => a.id === id) || null;
 }
 
-const WELCOME = (window.APP_CONFIG || {}).WELCOME || { title: 'ברוכים הבאים', subtitle: '' };
+const WELCOME = (window.APP_CONFIG || {}).WELCOME || { title: 'Welcome', subtitle: '' };
 
-// ---------- the game's name ----------
+// ---------- the site's name ----------
 
-const GAME_TITLE = (window.APP_CONFIG || {}).GAME_TITLE || 'שם למשחק';
+const GAME_TITLE = (window.APP_CONFIG || {}).GAME_TITLE || 'Retreat';
 document.querySelectorAll('[data-game-title]').forEach(node => { node.textContent = GAME_TITLE; });
 document.title = document.title ? GAME_TITLE + ' · ' + document.title : GAME_TITLE;
 
@@ -72,7 +77,7 @@ document.title = document.title ? GAME_TITLE + ' · ' + document.title : GAME_TI
 function optionsPreview(question) {
   const ltr = question.type === 'scale';
   return el('div', { class: 'choices' + (ltr ? ' ltr' : '') },
-    question.options.map(opt => el('span', { class: 'choice' }, opt)));
+    question.options.map(opt => el('span', { class: 'choice', dir: 'auto' }, opt)));
 }
 
 // ---------- chart ----------
@@ -94,7 +99,7 @@ function renderBars(container, results, question) {
           el('span', { class: 'bar-count' }, c.count),
           el('span', { class: 'bar-pct' }, pct + '%')),
         el('div', { class: 'bar-track' }, bar),
-        el('div', { class: 'bar-label' }, c.label));
+        el('div', { class: 'bar-label', dir: 'auto' }, c.label));
     }));
   container.replaceChildren(chart);
   // Force a layout at height 0, then set the real heights so they animate. (Not requestAnimationFrame:

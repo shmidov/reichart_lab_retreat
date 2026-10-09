@@ -1,13 +1,13 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>לוח מנחה</title>
+  <title>Host</title>
   <meta name="robots" content="noindex">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
 </head>
@@ -17,16 +17,16 @@
       <div class="brand"><img class="logo-sm" src="assets/logo.svg" alt="Reichart Group Retreat"></div>
     </header>
     <section class="card enter">
-      <div class="eyebrow">לוח מנחה</div>
-      <h1>כניסת מנחה</h1>
+      <div class="eyebrow">Host</div>
+      <h1>Host sign-in</h1>
       <form id="login-form">
-        <label>סיסמה
+        <label>Host code
           <!-- A masked text field rather than type="password": this isn't real security, and it keeps
-             browsers (e.g. Safari) from offering to save it. -->
+               browsers (e.g. Safari) from offering to save it. -->
           <input type="text" id="host-code" class="masked" autocomplete="off" autocapitalize="off"
                  autocorrect="off" spellcheck="false" data-1p-ignore data-lpignore="true" required>
         </label>
-        <button class="primary big" type="submit">כניסה</button>
+        <button class="primary big" type="submit">Sign in</button>
       </form>
     </section>
     <p id="login-status" class="status"></p>
@@ -34,59 +34,59 @@
 
   <main class="wrap wide" id="panel" hidden>
     <div class="topbar">
-      <div class="brand"><img class="logo-sm" src="assets/logo.svg" alt="Reichart Group Retreat"><span class="muted" style="font-weight:400">לוח מנחה</span></div>
+      <div class="brand"><img class="logo-sm" src="assets/logo.svg" alt="Reichart Group Retreat"><span class="muted" style="font-weight:400">Host</span></div>
       <div class="links">
-        <a href="screen.html" target="_blank" rel="noopener">פתיחת מסך התצוגה ↗</a>
-        <a href="./" target="_blank" rel="noopener">עמוד המשתתפים ↗</a>
-        <button class="link" id="logout" type="button">יציאה</button>
+        <a href="screen.html" target="_blank" rel="noopener">Open the screen ↗</a>
+        <a href="./" target="_blank" rel="noopener">Participant page ↗</a>
+        <button class="link" id="logout" type="button">Sign out</button>
       </div>
     </div>
 
     <div class="stats">
       <span class="pill" id="server-pill"></span>
       <span class="pill phase" id="phase-pill"></span>
-      <span class="pill">משתתפים: <b id="player-count">0</b></span>
-      <span class="pill" id="answered-pill" hidden>ענו: <b id="answered-count" dir="ltr">0</b></span>
+      <span class="pill">Participants: <b id="player-count">0</b></span>
+      <span class="pill" id="answered-pill" hidden>Answered: <b id="answered-count">0</b></span>
       <span class="pill" id="sheet-pill"></span>
     </div>
 
     <section class="card">
-      <div class="eyebrow">מה מוצג עכשיו</div>
-      <div class="segmented" id="activities" role="group" aria-label="פעילות"></div>
+      <div class="eyebrow">Now showing</div>
+      <div class="segmented" id="activities" role="group" aria-label="Activity"></div>
       <div id="activity-info"></div>
     </section>
 
     <div id="game-panel">
     <div class="grid2">
       <section class="card now">
-        <div class="eyebrow">עכשיו</div>
+        <div class="eyebrow">Now</div>
         <div id="now"></div>
       </section>
       <section class="card">
-        <div class="eyebrow">הבאה בתור</div>
+        <div class="eyebrow">Up next</div>
         <div id="next"></div>
       </section>
     </div>
 
     <div class="controls">
       <button class="primary" id="primary-btn" type="button"></button>
-      <button id="lobby-btn" type="button">חזרה ללובי</button>
-      <button id="end-btn" type="button">מסך סיום</button>
+      <button id="lobby-btn" type="button">Back to lobby</button>
+      <button id="end-btn" type="button">End screen</button>
     </div>
 
     <section class="card">
       <div class="card-head">
-        <div class="eyebrow">משתתפים</div>
-        <button class="danger" id="reset-btn" type="button">משחק חדש</button>
+        <div class="eyebrow">Participants</div>
+        <button class="danger" id="reset-btn" type="button">New game</button>
       </div>
       <div class="chips" id="players"></div>
-      <div class="muted small">✓ כבר ענה/תה על השאלה הפתוחה.</div>
+      <div class="muted small">✓ has answered the open question.</div>
     </section>
 
     <section class="card">
       <div class="card-head">
-        <div class="eyebrow">כל השאלות</div>
-        <button id="reload-questions" type="button">רענון מהגיליון</button>
+        <div class="eyebrow">All questions</div>
+        <button id="reload-questions" type="button">Reload from Sheet</button>
       </div>
       <ul class="qlist" id="qlist"></ul>
     </section>
@@ -99,7 +99,8 @@
   <script>
     const $ = id => document.getElementById(id);
     const SERVER_ALIVE_MS = 10000;
-    const TYPE_LABELS = { scale: 'סולם', yesno: 'כן / לא', choice: 'בחירה' };
+    const TYPE_LABELS = { scale: 'Scale', yesno: 'Yes / no', choice: 'Choice' };
+    const LEAVE_OPEN_QUESTION = 'The open question will close and its answers will be saved. Continue?';
 
     let relay = null;
     let state = null;
@@ -109,11 +110,11 @@
     let waitingSince = 0; // a command was sent and we're waiting for the screen to apply it
     let renderedNowKey = null;
 
-    // ---------- login (just separates host from players) ----------
+    // ---------- sign-in (just separates host from players) ----------
 
-    function tryLogin(password) {
-      if (password !== window.APP_CONFIG.HOST_PASSWORD) return false;
-      sessionStorage.setItem('hostPassword', password);
+    function tryLogin(code) {
+      if (code !== window.APP_CONFIG.HOST_PASSWORD) return false;
+      sessionStorage.setItem('hostPassword', code);
       $('login-wrap').hidden = true;
       $('panel').hidden = false;
       connect();
@@ -125,7 +126,7 @@
       const code = $('host-code').value;
       $('host-code').value = ''; // nothing left in the field for a password manager to pick up
       if (!tryLogin(code)) {
-        $('login-status').textContent = 'סיסמה שגויה.';
+        $('login-status').textContent = 'Wrong code.';
         $('login-status').className = 'status error';
       }
     });
@@ -167,14 +168,13 @@
       render();
     }
 
-    // ---------- controls ----------
+    // ---------- game controls ----------
 
     const questions = () => (host && host.questions) || [];
     const nextIndex = () => (state ? state.index + 1 : 0);
 
     function openQuestion(index) {
-      const warn = state && state.phase === 'open' ? 'השאלה הפתוחה תיסגר והתשובות שלה יישמרו. להמשיך?' : null;
-      send('open', { index }, warn);
+      send('open', { index }, state && state.phase === 'open' ? LEAVE_OPEN_QUESTION : null);
     }
 
     $('primary-btn').addEventListener('click', () => {
@@ -184,45 +184,53 @@
       send('end');
     });
     $('lobby-btn').addEventListener('click', () => send('lobby'));
-    $('end-btn').addEventListener('click', () => send('end', null, 'לעבור למסך הסיום?'));
+    $('end-btn').addEventListener('click', () => send('end', null, 'Show the end screen?'));
     $('reload-questions').addEventListener('click', () => send('reloadQuestions'));
     $('reset-btn').addEventListener('click', () => send('resetGame', null,
-      'להתחיל משחק חדש? רשימת המשתתפים תתאפס והמשחק יחזור ללובי. (מה שכבר נשמר בגיליון נשאר.)'));
+      'Start a new game? The participant list is cleared and the game returns to the lobby. (Anything already saved in the Sheet stays.)'));
 
     // ---------- activities ----------
 
-    const ACTIVITY_CHOICES = [{ id: 'welcome', name: 'מסך פתיחה' }].concat(window.APP_CONFIG.ACTIVITIES || []);
+    const ACTIVITY_CHOICES = [{ id: 'welcome', title: 'Welcome screen' }].concat(window.APP_CONFIG.ACTIVITIES || []);
 
     function switchActivity(id) {
-      const leavingOpenQuestion = state && state.phase === 'open' && activityById(state.activity)
-        && activityById(state.activity).type === 'game' && id !== state.activity;
-      send('activity', { activity: id }, leavingOpenQuestion ? 'השאלה הפתוחה תיסגר והתשובות שלה יישמרו. להמשיך?' : null);
+      const current = state && activityById(state.activity);
+      const leavingOpenQuestion = current && current.type === 'game' && state.phase === 'open' && id !== state.activity;
+      send('activity', { activity: id }, leavingOpenQuestion ? LEAVE_OPEN_QUESTION : null);
     }
 
     function renderActivities(s, busy, alive) {
       const current = s ? s.activity || 'welcome' : null;
-      $('activities').replaceChildren(...ACTIVITY_CHOICES.map(a => el('button', {
+      $('activities').replaceChildren(...ACTIVITY_CHOICES.map((a, i) => el('button', {
         type: 'button',
         class: 'seg' + (a.id === current ? ' current' : ''),
         'aria-pressed': a.id === current ? 'true' : 'false',
         disabled: busy || !alive || !s,
         onclick: () => switchActivity(a.id),
-      }, a.id === current ? icon('check', 16) : null, a.name)));
+      }, a.id === current ? icon('check', 16) : null, i ? i + '. ' : '', a.title)));
 
       const activity = s ? activityById(current) : null;
       $('game-panel').hidden = !(activity && activity.type === 'game');
+      const info = $('activity-info');
       if (!s) {
-        $('activity-info').replaceChildren();
+        info.replaceChildren();
       } else if (!activity) {
-        $('activity-info').replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
-          'כולם רואים את מסך הפתיחה: ' + WELCOME.title));
-      } else if (activity.type === 'writing') {
-        setChildren($('activity-info'), el('div', { style: 'margin-top:16px' },
-          el('div', { class: 'q-text' }, activity.title),
-          activity.explanation ? el('div', { class: 'explanation' }, activity.explanation) : null,
-          el('div', { class: 'q-meta' }, 'במסך התצוגה: הכותרת וההסבר. בטלפונים: הכותרת בלבד.')));
+        info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
+          'Everyone sees the welcome screen: ' + WELCOME.title));
+      } else if (activity.type === 'lecture') {
+        info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
+          'The title is shown on the screen and on phones.'));
+      } else if (activity.type === 'submit') {
+        const names = (host && host.submitted) || [];
+        setChildren(info, el('div', { style: 'margin-top:16px' },
+          el('div', { class: 'q-meta' },
+            (activity.mode === 'group' ? 'Group' : 'Personal') + ' links, saved to the "' + activity.sheet + '" tab of the Sheet.'),
+          el('div', { class: 'chips' }, names.length
+            ? names.map(n => el('span', { class: 'chip done', dir: 'auto' }, icon('check', 14), n))
+            : el('span', { class: 'muted' }, 'No links yet.')),
+          el('div', { class: 'muted small' }, names.length + (names.length === 1 ? ' person has' : ' people have') + ' submitted.')));
       } else {
-        $('activity-info').replaceChildren();
+        info.replaceChildren();
       }
       return activity;
     }
@@ -231,12 +239,12 @@
 
     function questionBlock(q, extra) {
       return el('div', {},
-        el('div', { class: 'q-text' }, q.text),
-        q.explanation ? el('div', { class: 'explanation' }, q.explanation) : null,
+        el('div', { class: 'q-text', dir: 'auto' }, q.text),
+        q.explanation ? el('div', { class: 'explanation', dir: 'auto' }, q.explanation) : null,
         el('div', { class: 'q-meta' }, (TYPE_LABELS[q.type] || q.type) + ': ',
           q.type === 'scale'
-            ? el('bdi', { dir: 'ltr' }, q.options[0] + '–' + q.options[q.options.length - 1])
-            : q.options.join(' · ')),
+            ? q.options[0] + '–' + q.options[q.options.length - 1]
+            : el('bdi', {}, q.options.join(' · '))),
         extra || null);
     }
 
@@ -246,12 +254,12 @@
         if (s.phase === 'results' && s.results) {
           extra = el('div', { class: 'host-bars' });
           renderBars(extra, s.results, s.question);
-          extra.append(el('div', { class: 'muted small' }, 'סה״כ ' + s.results.total + ' תשובות'));
+          extra.append(el('div', { class: 'muted small' }, s.results.total + ' responses in total'));
         }
         $('now').replaceChildren(el('div', { class: 'counter' }, questionCounter(s)), questionBlock(s.question, extra));
       } else {
         $('now').replaceChildren(el('div', { class: 'muted' },
-          s.phase === 'end' ? 'המשחק הסתיים (מסך הסיום מוצג).' : 'לובי: אין שאלה פתוחה.'));
+          s.phase === 'end' ? 'The game is over (the end screen is showing).' : 'Lobby: no question is open.'));
       }
     }
 
@@ -259,9 +267,9 @@
       if (!relay) return;
       const alive = Date.now() - heartbeatAt < SERVER_ALIVE_MS;
       const pill = $('server-pill');
-      if (!connected) { pill.textContent = 'אין חיבור לאינטרנט / לשרת ההודעות'; pill.className = 'pill bad'; }
-      else if (!alive) { pill.textContent = 'מסך התצוגה לא פתוח'; pill.className = 'pill bad'; }
-      else { pill.textContent = 'מסך התצוגה מחובר ✓'; pill.className = 'pill good'; }
+      if (!connected) { pill.textContent = 'No internet / relay connection'; pill.className = 'pill bad'; }
+      else if (!alive) { pill.textContent = 'The screen is not open'; pill.className = 'pill bad'; }
+      else { pill.textContent = 'Screen connected ✓'; pill.className = 'pill good'; }
 
       // A command that got no response within 4s is no longer "in flight".
       if (waitingSince && Date.now() - waitingSince > 4000) waitingSince = 0;
@@ -274,9 +282,9 @@
 
       if (!state) {
         renderedNowKey = null;
-        $('phase-pill').textContent = 'מחכה למסך התצוגה…';
+        $('phase-pill').textContent = 'Waiting for the screen…';
         $('now').replaceChildren(el('div', { class: 'muted' },
-          'פתחו את מסך התצוגה (screen.html) במחשב שמחובר למקרן. האתר כולו רץ משם.'));
+          'Open the screen (screen.html) on the laptop connected to the projector. The whole site runs from there.'));
         $('next').replaceChildren();
         $('primary-btn').textContent = '…';
         return;
@@ -287,7 +295,7 @@
       const players = host ? host.players : [];
       const answered = host ? host.answered : [];
       const inGame = !!activity && activity.type === 'game';
-      $('phase-pill').textContent = !activity ? 'מסך פתיחה'
+      $('phase-pill').textContent = !activity ? 'Welcome screen'
         : inGame ? activity.name + ' · ' + (PHASE_LABELS[s.phase] || s.phase) : activity.name;
       $('player-count').textContent = s.playerCount;
       $('answered-pill').hidden = !inGame || s.phase !== 'open';
@@ -297,9 +305,9 @@
       if (!host) { sheet.textContent = ''; sheet.hidden = true; }
       else {
         sheet.hidden = false;
-        if (host.uploadError) { sheet.textContent = 'שמירה לגיליון נכשלה, מנסה שוב: ' + host.uploadError; sheet.className = 'pill bad'; }
-        else if (host.pendingUploads) { sheet.textContent = 'שומר לגיליון…'; sheet.className = 'pill'; }
-        else { sheet.textContent = 'גיליון: הכול נשמר ✓'; sheet.className = 'pill good'; }
+        if (host.uploadError) { sheet.textContent = 'Saving to the Sheet failed, retrying: ' + host.uploadError; sheet.className = 'pill bad'; }
+        else if (host.pendingUploads) { sheet.textContent = 'Saving to the Sheet…'; sheet.className = 'pill'; }
+        else { sheet.textContent = 'Sheet: all saved ✓'; sheet.className = 'pill good'; }
       }
 
       // Now (rebuilt only when it changes, so the chart doesn't re-animate)
@@ -314,38 +322,38 @@
       const nextQ = qs[ni];
       $('next').replaceChildren(nextQ
         ? el('div', {}, el('div', { class: 'counter' }, counterParts(ni, qs.length)), questionBlock(nextQ))
-        : el('div', { class: 'muted' }, 'אין שאלות נוספות.'));
+        : el('div', { class: 'muted' }, 'No more questions.'));
 
       // Primary control
       const primary = $('primary-btn');
-      if (busy) primary.textContent = 'רגע…';
-      else if (s.phase === 'open') primary.textContent = 'סגירת השאלה והצגת התוצאות';
-      else if (nextQ) primary.textContent = 'פתיחת שאלה ' + (ni + 1) + ' ←';
-      else primary.textContent = 'מעבר למסך הסיום';
+      if (busy) primary.textContent = 'One moment…';
+      else if (s.phase === 'open') primary.textContent = 'Close question and show results';
+      else if (nextQ) primary.textContent = 'Open question ' + (ni + 1) + ' →';
+      else primary.textContent = 'Go to the end screen';
       primary.hidden = s.phase === 'end' && !nextQ;
 
       // Players
       const done = new Set(answered);
       $('players').replaceChildren(...(players.length
-        ? players.map(p => el('span', { class: 'chip' + (done.has(p) ? ' done' : '') }, done.has(p) ? icon('check', 14) : null, p))
-        : [el('span', { class: 'muted' }, 'עוד אין משתתפים.')]));
+        ? players.map(p => el('span', { class: 'chip' + (done.has(p) ? ' done' : ''), dir: 'auto' }, done.has(p) ? icon('check', 14) : null, p))
+        : [el('span', { class: 'muted' }, 'No participants yet.')]));
 
       // Question list
       if (host && host.questionsError) {
         $('qlist').replaceChildren(el('li', { class: 'status error', style: 'text-align:start' },
-          'טעינת השאלות מהגיליון נכשלה: ' + host.questionsError));
+          'Could not load the questions from the Sheet: ' + host.questionsError));
         return;
       }
       if (!qs.length) {
-        $('qlist').replaceChildren(el('li', { class: 'muted' }, 'טוען שאלות מהגיליון…'));
+        $('qlist').replaceChildren(el('li', { class: 'muted' }, 'Loading questions from the Sheet…'));
         return;
       }
       $('qlist').replaceChildren(...qs.map((q, i) => {
         const isCurrent = i === s.index && (s.phase === 'open' || s.phase === 'results');
         return el('li', { class: isCurrent ? 'current' : '' },
           el('span', { class: 'qnum' }, i + 1),
-          el('div', { class: 'qbody' }, q.text, el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
-          el('button', { type: 'button', onclick: () => openQuestion(i), disabled: busy || !alive }, 'פתיחה'));
+          el('div', { class: 'qbody' }, el('div', { dir: 'auto' }, q.text), el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
+          el('button', { type: 'button', onclick: () => openQuestion(i), disabled: busy || !alive }, 'Open'));
       }));
     }
 

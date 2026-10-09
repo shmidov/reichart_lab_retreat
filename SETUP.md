@@ -2,30 +2,36 @@
 
 ## How it works
 
-- **The projector screen (`screen.html`) runs the game.** It keeps the game in memory (and in the laptop's
-  browser storage, so a reload loses nothing).
+The site is a small retreat website. The host switches the room between **activities** from the host page;
+until the host picks one, phones and the projector show the welcome screen. The activities, in
+[`docs/config.js`](docs/config.js) (`ACTIVITIES`):
+
+| # | Title | Type | What happens |
+|---|---|---|---|
+| 1 | The review process and its transformation | `lecture` | The title, on the projector and on phones. |
+| 2 | Research identity, impact and publication in the AI era | `game` | The opinion game (below). |
+| 3 | Future works | `submit`, personal | Everyone pastes the link to their own Google Doc. |
+| 4 | Position blogpost | `submit`, group | Anyone pastes their group's link (the same link from several people is fine). |
+
+- **The projector screen (`screen.html`) runs the live site.** It keeps everything in memory (and in the
+  laptop's browser storage, so a reload loses nothing).
 - **Phones and the host page talk to it through public relays** (free MQTT brokers: HiveMQ and EMQX).
-  Every message goes through both relays, so the game keeps working if one is down. Updates take about 0.1–0.3 s.
-- **The Google Sheet is only used between questions.** The screen loads the questions from it when it starts,
-  or when the host clicks **רענון מהגיליון**. After each question, the bar chart is shown immediately from
-  memory, and the answers are saved to the Sheet in the background. If a save fails, the screen keeps
-  retrying, and the host page shows the status ("גיליון: הכול נשמר ✓").
+  Every message goes through both relays, so the site keeps working if one is down. Updates take about 0.1–0.3 s.
+- **The game uses the Google Sheet only between questions.** The screen loads the questions when it starts,
+  or when the host clicks **Reload from Sheet**. After each question, the bar chart is shown immediately from
+  memory, and the answers are saved to the Sheet in the background (the host page shows "Sheet: all saved ✓").
+- **Links (activities 3 and 4) go straight from the phones to the Sheet**, each activity into its own tab
+  (`Future works`, `Position blogpost`), with the person's name and link. Submitting again replaces that
+  person's row, so people can fix a link. The projector and host page show who has submitted.
 
-The site has **activities** that the host switches between from the host page. Until the host picks one,
-phones and the projector show the welcome screen. The current activities are:
-- **The opinion game:** everything described here.
-- **A writing task:** the projector shows its title and explanation, and phones show only the title.
-  It is display only, with no storage.
+The game asks for a name before its first question; the link forms ask for it too (prefilled if known).
+Switching away from the game in the middle of a question closes that question and saves it.
 
-Players are asked for their name only when the game is on. Switching away from the game in the middle of a
-question closes that question and saves it.
-
-Settings are in [`docs/config.js`](docs/config.js):
-- `WELCOME`: the welcome screen's texts.
-- `ACTIVITIES`: the activities, their names, and the writing task's title and explanation (all placeholders).
-- `GAME_TITLE`: the site's name, shown in every header (a placeholder for now).
-- `HOST_PASSWORD`: the host password. It only separates the host from the players.
-- `GAME_ID`: separates this game's messages from anyone else's on the public relays.
+Other settings in [`docs/config.js`](docs/config.js):
+- `WELCOME`: the welcome screen's texts (placeholders).
+- `GAME_TITLE`: the site's name, used as the browser tab title.
+- `HOST_PASSWORD`: the host code. It only separates the host from the players.
+- `GAME_ID`: separates this site's messages from anyone else's on the public relays.
 - `API_URL`: the Apps Script URL.
 
 ## 1. Google Sheet + backend (one time)
@@ -35,6 +41,7 @@ Settings are in [`docs/config.js`](docs/config.js):
 3. In the toolbar, select the function **`setup`** and click **Run**. Allow the permissions:
    *Advanced → Go to … (unsafe)*. This step is safe because the script is your own.
    This creates the tabs `Questions` (with sample questions), `Responses` and `Summary` at the bottom of the Sheet.
+   The link tabs (`Future works`, `Position blogpost`) are created automatically with the first submission.
    The Execution log prints the Sheet's link.
 4. **Deploy → New deployment** → type **Web app**:
    - Execute as **Me**, and Who has access **Anyone**.
@@ -63,27 +70,29 @@ Edit the `Questions` tab. Each row is one question:
 | `question` | The question text. |
 | `explanation` | Optional text shown under the question. |
 | `type` | `scale`, `yesno` or `choice` |
-| `options` | `scale`: a range like `1-10`. `yesno`: leave empty (shows כן / לא). `choice`: options separated by `\|`, e.g. `בוקר \| צהריים \| ערב` |
+| `options` | `scale`: a range like `1-10`. `yesno`: leave empty (shows Yes / No). `choice`: options separated by `\|`, e.g. `Morning \| Noon \| Evening` |
 
-After editing, click **רענון מהגיליון** on the host page.
+After editing, click **Reload from Sheet** on the host page. Questions may be in any language.
 
 ## On the day
 
-1. On the projector laptop, open **screen.html** first and keep it in front. It is the game.
-2. Open **host.html** (on a phone or a laptop) and log in. The top of the page should say **מסך התצוגה מחובר ✓**.
-3. Players scan the QR code on the projector.
-4. For each question: **פתיחת שאלה** (open question), then **סגירת השאלה והצגת התוצאות** (close and show results).
-5. To clear the players list before the real game (e.g. after a rehearsal), click **משחק חדש** (new game).
-   Rows already saved in the Sheet are kept; delete them by hand if they came from a rehearsal.
+1. On the projector laptop, open **screen.html** first and keep it in front. It runs the site.
+2. Open **host.html** (on a phone or a laptop) and sign in. The top of the page should say **Screen connected ✓**.
+3. Everyone scans the QR code on the welcome screen.
+4. Under **Now showing**, pick the activity. In the game, for each question: **Open question**, then
+   **Close question and show results**.
+5. To clear the participant list (e.g. after a rehearsal), click **New game**. Rows already saved in the Sheet
+   are kept; delete them by hand if they came from a rehearsal.
 
-If the projector laptop has to change, open screen.html on the new one. It shows "מסך משני" (secondary
-screen) with a button to take over. Answers to a question that is still open at that moment are lost.
+If the projector laptop has to change, open screen.html on the new one. It shows "Secondary screen" with a
+button to take over. Answers to a game question that is still open at that moment are lost.
 
 ## Results in the Sheet
 
 - `Responses`: one row per person per question (time, question, name, answer).
 - `Summary`: one row per question: the number of answers, the average (for scales), and the counts and
   percentages for each answer.
+- `Future works`, `Position blogpost`: one row per person (time, name, link).
 
 ## Local rehearsal
 

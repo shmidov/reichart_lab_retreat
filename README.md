@@ -1,26 +1,24 @@
-# Reichart Lab Retreat Game
+# Reichart Lab Retreat
 
-A small retreat website. The host switches the room between activities: a welcome screen, an opinion game
-and a writing task. Phones and the projector follow along.
+A small retreat website. The host switches the room between activities (a welcome screen, a lecture, an
+opinion game, and two writing activities where people submit links to their Google Docs); phones and the
+projector follow along.
 
-An opinion game in Hebrew for the lab retreat. There are no right answers: the host opens a question,
-everyone answers on their phone, and the group's answers appear as a bar chart.
+- **Projector screen** (`docs/screen.html`): runs the live site in memory and shows the current activity:
+  the QR code, the game's questions and bar charts, the writing prompts.
+- **Participant page** (`docs/index.html`): opened by QR code; answer game questions, submit links.
+- **Host page** (`docs/host.html`, code in `docs/config.js`): choose the activity and run the game.
 
-- **Projector screen** (`docs/screen.html`): runs the game in memory, and shows the QR code, each question
-  and its bar chart.
-- **Player page** (`docs/index.html`): join by QR code with your name, then answer the current question.
-- **Host page** (`docs/host.html`, password in `docs/config.js`): see the current and next question and
-  control the pace.
-
-Live updates go through free public MQTT relays. The Google Sheet (via Apps Script) provides the questions,
-and stores every named answer plus a per-question summary, saved in the background after each question.
+Live updates go through free public MQTT relays. A Google Sheet (via Apps Script) provides the game's
+questions and stores every answer, a per-question summary, and the submitted links.
 
 See [SETUP.md](SETUP.md) for deployment, the question format, and local rehearsal.
 
 ```
 docs/                 the website (GitHub Pages)
+  config.js               activities, texts and settings
   assets/relay.js         messaging over the public relays
-  assets/game-server.js   the game, run by the projector screen
-apps-script/Code.gs   Google Sheet backend (questions + saving)
-dev/                  local mock server and simulated players
+  assets/game-server.js   the live state, run by the projector screen
+apps-script/Code.gs   Google Sheet backend (questions, results, links)
+dev/                  local mock server, simulated players, logo conversion
 ```

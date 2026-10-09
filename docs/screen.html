@@ -1,12 +1,12 @@
 <!doctype html>
-<html lang="he" dir="rtl">
+<html lang="en" dir="ltr">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>מסך תצוגה</title>
+  <title>Screen</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600;9..40,700&family=Heebo:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/mqtt/5.10.1/mqtt.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -18,8 +18,8 @@
       <div class="screen-status">
         <span id="conn"></span>
         <span id="role"></span>
-        <button class="link" id="takeover" type="button" hidden>להפוך למסך הראשי</button>
-        <span class="live off" id="live">מתחבר…</span>
+        <button class="link" id="takeover" type="button" hidden>Make this the main screen</button>
+        <span class="live off" id="live">Connecting…</span>
       </div>
     </header>
     <div class="stage-body" id="body">
@@ -28,7 +28,7 @@
   </div>
   <div class="corner-qr" id="corner-qr" hidden>
     <div class="qr-box" id="corner-qr-code"></div>
-    <div>להצטרפות</div>
+    <div>Join</div>
   </div>
 
   <script src="config.js"></script>
@@ -59,9 +59,9 @@
     let heartbeatAt = 0;
 
     const relay = new Relay((connected, total) => {
-      $('conn').textContent = connected ? '' : 'אין חיבור, מנסה שוב…';
+      $('conn').textContent = connected ? '' : 'No connection, retrying…';
       $('conn').className = connected ? '' : 'status error';
-      $('live').textContent = connected ? 'מחובר' : 'מתחבר…';
+      $('live').textContent = connected ? 'Connected' : 'Connecting…';
       $('live').className = 'live' + (connected ? '' : ' off');
     });
 
@@ -112,13 +112,13 @@
     function becomeViewer() {
       if (server) { server.stop(); server = null; }
       mode = 'viewer';
-      $('role').textContent = 'מסך משני';
+      $('role').textContent = 'Secondary screen';
       $('takeover').hidden = false;
       if (lastState) { state = lastState; render(); }
     }
 
     $('takeover').addEventListener('click', () => {
-      if (confirm('להעביר את המשחק למסך הזה? (תשובות שעוד לא נסגרו בשאלה הפתוחה יאבדו)')) becomeServer(true);
+      if (confirm('Move the game to this screen? (Answers to a question that is still open will be lost.)')) becomeServer(true);
     });
 
     // The "other screen" only ever sent its last (retained) heartbeat: it's gone, so take over automatically.
@@ -126,7 +126,7 @@
     setInterval(() => {
       if (mode !== 'viewer' || Date.now() - heartbeatAt < SERVER_ALIVE_MS) return;
       if (otherBeats <= 1) becomeServer(false);
-      else $('role').textContent = 'המסך הראשי לא מחובר';
+      else $('role').textContent = 'The main screen is offline';
     }, 2000);
 
     // ---------- rendering ----------
@@ -144,13 +144,17 @@
       }
       document.querySelectorAll('[data-count=players]').forEach(n => { n.textContent = s.playerCount; });
       document.querySelectorAll('[data-count=answered]').forEach(n => { n.textContent = s.answeredCount; });
+      document.querySelectorAll('[data-count=submitted]').forEach(n => { n.textContent = s.submittedCount || 0; });
+      document.querySelectorAll('[data-label=submitted]').forEach(n => {
+        n.textContent = s.submittedCount === 1 ? 'link submitted' : 'links submitted';
+      });
     }
 
     function scene(...children) {
       setChildren(body, el('div', { class: 'scene' }, children));
     }
 
-    /** The site's QR code inside the slate join panel (used by the welcome screen and the game lobby). */
+    /** The site's QR code inside the slate join panel (welcome screen and game lobby). */
     function joinPanel(caption) {
       const qr = el('div', { class: 'qr-box' });
       const panel = el('div', { class: 'join-panel' },
@@ -165,10 +169,11 @@
     function build(s) {
       const activity = activityById(s.activity);
       document.body.classList.toggle('is-welcome', !activity);
-      $('corner-qr').hidden = !(activity && activity.type === 'game' && s.phase === 'open');
+      $('corner-qr').hidden = !(activity && (activity.type === 'submit' || (activity.type === 'game' && s.phase === 'open')));
 
       if (!activity) return buildWelcome();
-      if (activity.type === 'writing') return buildWriting(activity);
+      if (activity.type === 'lecture') return buildLecture(activity);
+      if (activity.type === 'submit') return buildSubmit(activity);
       return buildGame(s, activity);
     }
 
@@ -178,46 +183,53 @@
           el('img', { class: 'logo-lg', src: 'assets/logo.svg', alt: 'Reichart Group Retreat' }),
           el('h1', { class: 'welcome-title' }, WELCOME.title),
           WELCOME.subtitle ? el('p', { class: 'lead' }, WELCOME.subtitle) : null),
-        joinPanel('סרקו כדי להיכנס')));
+        joinPanel('Scan to join')));
     }
 
-    function buildWriting(activity) {
+    function buildLecture(activity) {
       scene(
         el('div', { class: 'eyebrow' }, activity.name),
-        el('p', { class: 's-question' }, activity.title),
-        activity.explanation ? el('p', { class: 'explanation writing-text' }, activity.explanation) : null);
+        el('p', { class: 's-question', dir: 'auto' }, activity.title));
+    }
+
+    function buildSubmit(activity) {
+      scene(
+        el('div', { class: 'eyebrow' }, activity.name),
+        el('p', { class: 's-question', dir: 'auto' }, activity.title),
+        activity.instructions ? el('p', { class: 'explanation writing-text', dir: 'auto' }, activity.instructions) : null,
+        el('div', { class: 'meter' },
+          el('span', { class: 'big', 'data-count': 'submitted' }),
+          el('span', { 'data-label': 'submitted' })));
     }
 
     function buildGame(s, activity) {
-      const gameTitle = activity.title || GAME_TITLE;
-
       if (s.phase === 'open' && s.question) {
         scene(
-          el('div', { class: 'eyebrow' }, 'מה דעתכם?'),
+          el('div', { class: 'eyebrow' }, 'What do we think?'),
           el('div', { class: 'counter' }, questionCounter(s)),
-          el('p', { class: 's-question' }, s.question.text),
-          s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
+          el('p', { class: 's-question', dir: 'auto' }, s.question.text),
+          s.question.explanation ? el('p', { class: 'explanation', dir: 'auto' }, s.question.explanation) : null,
           optionsPreview(s.question),
           el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'answered' }),
-            el('span', {}, 'מתוך'),
+            el('span', {}, 'of'),
             el('span', { 'data-count': 'players' }),
-            el('span', {}, 'שיתפו את דעתם')));
+            el('span', {}, 'have shared their view')));
         return;
       }
 
       if (s.phase === 'results' && s.question && s.results) {
         const chart = el('div');
         scene(
-          el('div', { class: 'eyebrow' }, 'בואו נראה מה חשבנו'),
+          el('div', { class: 'eyebrow' }, "Let's see what we think"),
           el('div', { class: 'counter' }, questionCounter(s)),
-          el('p', { class: 's-question compact' }, s.question.text),
-          s.question.explanation ? el('p', { class: 'explanation' }, s.question.explanation) : null,
+          el('p', { class: 's-question compact', dir: 'auto' }, s.question.text),
+          s.question.explanation ? el('p', { class: 'explanation', dir: 'auto' }, s.question.explanation) : null,
           chart,
           el('div', { class: 'meter small', style: 'margin-top:2.5vh' },
             el('span', { class: 'big' }, s.results.total),
-            el('span', {}, 'תשובות'),
-            el('span', { class: 'discuss', style: 'margin:0 1.2em 0 0' }, 'מה אפשר ללמוד מהתוצאות?')));
+            el('span', {}, s.results.total === 1 ? 'response' : 'responses'),
+            el('span', { class: 'discuss', style: 'margin:0 0 0 1.2em' }, 'What can we learn from this?')));
         renderBars(chart, s.results, s.question);
         return;
       }
@@ -225,8 +237,8 @@
       if (s.phase === 'end') {
         scene(el('div', { class: 'finale' },
           el('div', { class: 'breath still' }),
-          el('h1', {}, 'תודה רבה!'),
-          el('p', { class: 'muted' }, gameTitle)));
+          el('h1', {}, 'Thank you!'),
+          el('p', { class: 'muted', dir: 'auto' }, activity.title)));
         return;
       }
 
@@ -234,12 +246,12 @@
       scene(el('div', { class: 'lobby' },
         el('div', {},
           el('div', { class: 'eyebrow' }, activity.name),
-          el('h1', {}, gameTitle),
-          el('p', { class: 'lead' }, 'סרקו את הקוד, הזינו את השם שלכם וחכו לשאלה הראשונה.'),
+          el('h1', { class: 'lobby-title', dir: 'auto' }, activity.title),
+          el('p', { class: 'lead' }, 'Scan the code, enter your name, and wait for the first question.'),
           el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'players' }),
-            el('span', {}, 'משתתפים הצטרפו'))),
-        joinPanel('סרקו כדי להצטרף')));
+            el('span', {}, 'joined so far'))),
+        joinPanel('Scan to join')));
     }
   </script>
 </body>
