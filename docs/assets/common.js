@@ -60,9 +60,30 @@ function questionCounter(state) {
 
 // ---------- activities ----------
 
-/** An activity from APP_CONFIG.ACTIVITIES by id (null for 'welcome' or unknown ids). */
+/** The built-in Agenda page: lists the configured activities. */
+const AGENDA = { id: 'agenda', type: 'agenda', name: 'Agenda', title: 'Agenda', accent: 'sage' };
+
+/** An activity by id: the Agenda, or one from APP_CONFIG.ACTIVITIES (null for 'welcome' or unknown ids). */
 function activityById(id) {
+  if (id === AGENDA.id) return AGENDA;
   return ((window.APP_CONFIG || {}).ACTIVITIES || []).find(a => a.id === id) || null;
+}
+
+/** The activity's current part (from the live state), or null if it has no parts. */
+function currentPart(activity, state) {
+  if (!activity || !activity.parts || !activity.parts.length) return null;
+  return activity.parts.find(p => p.id === (state && state.part)) || activity.parts[0];
+}
+
+/** "Position blogpost: Topic choice" for activities with parts, otherwise just the title. */
+function activityHeading(activity, part) {
+  return part ? activity.title + ': ' + part.label : activity.title;
+}
+
+/** What a 'submit' activity is doing now: 'topics', 'submit' or 'text'. */
+function submitKind(activity, part) {
+  if (part) return part.kind;
+  return activity.chooseTopics ? 'topics' : 'submit';
 }
 
 const WELCOME = (window.APP_CONFIG || {}).WELCOME || { title: 'Welcome', subtitle: '' };
@@ -72,9 +93,11 @@ function setAccent(activity) {
   document.body.dataset.accent = activity ? activity.accent || 'sage' : 'sand';
 }
 
-/** Activities that need to know who you are (and so ask for your name). */
-function needsName(activity) {
-  return !!activity && (activity.type === 'game' || activity.type === 'submit');
+/** Activities (and parts) that need to know who you are, and so ask for your name. */
+function needsName(activity, part) {
+  if (!activity) return false;
+  if (activity.type === 'game') return true;
+  return activity.type === 'submit' && (!part || part.kind !== 'text');
 }
 
 /**

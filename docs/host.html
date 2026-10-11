@@ -53,6 +53,7 @@
     <section class="card">
       <div class="eyebrow">Now showing</div>
       <div class="segmented" id="activities" role="group" aria-label="Activity"></div>
+      <div id="parts" hidden></div>
       <div id="activity-info"></div>
     </section>
 
@@ -191,7 +192,8 @@
 
     // ---------- activities ----------
 
-    const ACTIVITY_CHOICES = [{ id: 'welcome', title: 'Welcome screen' }].concat(window.APP_CONFIG.ACTIVITIES || []);
+    const ACTIVITY_CHOICES = [{ id: 'welcome', title: 'Welcome screen' }, AGENDA].concat(window.APP_CONFIG.ACTIVITIES || []);
+    const FIRST_NUMBERED = 2; // activities after Welcome and Agenda are numbered 1, 2, …
 
     function switchActivity(id) {
       const current = state && activityById(state.activity);
@@ -208,10 +210,25 @@
         disabled: busy || !alive || !s,
         onclick: () => switchActivity(a.id),
       }, a.id === current ? icon('check', 16) : el('span', { class: 'dot', 'data-accent': a.accent || 'sand' }),
-        i ? i + '. ' : '', a.title)));
+        i >= FIRST_NUMBERED ? (i - FIRST_NUMBERED + 1) + '. ' : '', a.title)));
 
       const activity = s ? activityById(current) : null;
+      const part = currentPart(activity, s);
       setAccent(activity);
+
+      // Parts of the current activity (e.g. Topic choice / Group writing / Presentations)
+      const parts = $('parts');
+      parts.hidden = !part;
+      if (part) {
+        parts.replaceChildren(el('div', { class: 'eyebrow', style: 'margin:18px 0 10px' }, activity.title + ': part'),
+          el('div', { class: 'segmented', role: 'group', 'aria-label': 'Part' }, activity.parts.map((p, i) => el('button', {
+            type: 'button',
+            class: 'seg' + (p.id === part.id ? ' current' : ''),
+            'aria-pressed': p.id === part.id ? 'true' : 'false',
+            disabled: busy || !alive,
+            onclick: () => send('part', { activity: activity.id, part: p.id }),
+          }, p.id === part.id ? icon('check', 16) : null, (i + 1) + '. ' + p.label))));
+      }
       $('game-panel').hidden = !(activity && activity.type === 'game');
       const info = $('activity-info');
       if (!s) {
@@ -219,20 +236,31 @@
       } else if (!activity) {
         info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
           'Everyone sees the welcome screen: ' + WELCOME.title));
+      } else if (activity.type === 'agenda') {
+        info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
+          'Everyone sees the agenda: the titles of activities 1–' + (window.APP_CONFIG.ACTIVITIES || []).length + '.'));
       } else if (activity.type === 'lecture') {
         info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
           'The title is shown on the screen and on phones.'));
+      } else if (activity.type === 'submit' && submitKind(activity, part) === 'text') {
+        setChildren(info, el('div', { style: 'margin-top:16px' },
+          el('div', { class: 'q-text' }, activityHeading(activity, part)),
+          part.screenText ? el('div', { class: 'q-meta' }, 'Screen: ' + part.screenText) : null,
+          part.phoneText ? el('div', { class: 'q-meta' }, 'Phones: ' + part.phoneText) : null,
+          part.text ? el('div', { class: 'q-meta' }, 'Screen and phones: ' + part.text) : null));
       } else if (activity.type === 'submit') {
         const names = (host && host.submitted) || [];
+        const topicsStep = submitKind(activity, part) === 'topics';
         setChildren(info, el('div', { style: 'margin-top:16px' },
           activity.chooseTopics ? topicsPanel(activity) : null,
+          part && topicsStep ? null : el('div', {},
           el('div', { class: 'eyebrow', style: 'margin-top:18px' }, 'Links'),
           el('div', { class: 'q-meta' },
             (activity.mode === 'group' ? 'Group' : 'Personal') + ' links, saved to the "' + activity.sheet + '" tab of the Sheet.'),
           el('div', { class: 'chips' }, names.length
             ? names.map(n => el('span', { class: 'chip done', dir: 'auto' }, icon('check', 14), n))
             : el('span', { class: 'muted' }, 'No links yet.')),
-          el('div', { class: 'muted small' }, names.length + (names.length === 1 ? ' person has' : ' people have') + ' submitted.')));
+          el('div', { class: 'muted small' }, names.length + (names.length === 1 ? ' person has' : ' people have') + ' submitted.'))));
       } else {
         info.replaceChildren();
       }

@@ -46,7 +46,13 @@
     const SAVED_NOTE = 'Saved ✓ You can change it until the question closes.';
     const LINK_SAVED_NOTE = 'Saved ✓ You can update it at any time.';
 
-    let name = storage.get('name');
+    // Signed in for this tab only (survives reloads and a sleeping phone). A new visit asks again, with the
+    // last name used on this device prefilled, so nobody is signed in (or added to the Sheet) by accident.
+    const session = {
+      get(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } },
+      set(k, v) { try { sessionStorage.setItem(k, v); } catch (e) { /* storage blocked */ } },
+    };
+    let name = session.get('name');
     let playerId = name ? idForName(name) : null;
     let state = null;
 
@@ -62,7 +68,7 @@
     relay.subscribe('state', s => {
       if (!isNewerState(s, state)) return;
       const changed = !state || s.activity !== state.activity || s.phase !== state.phase
-        || s.round !== state.round || s.epoch !== state.epoch
+        || s.round !== state.round || s.epoch !== state.epoch || s.part !== state.part
         || (s.topicOptions || []).length !== (state.topicOptions || []).length;
       state = s;
       if (changed) render();
@@ -84,7 +90,8 @@
       const previousId = playerId;
       name = value;
       playerId = idForName(name);
-      storage.set('name', name);
+      session.set('name', name);
+      storage.set('lastName', name);
       listenToMyChannel(previousId);
       sendJoin();
     }
@@ -116,7 +123,7 @@
       $('main').hidden = true;
       $('join').hidden = false;
       $('join-eyebrow').textContent = activity.title;
-      $('name-input').value = renaming ? '' : name || '';
+      $('name-input').value = renaming ? '' : name || storage.get('lastName') || '';
       $('join-status').textContent = '';
       $('name-input').focus();
     }
@@ -212,12 +219,12 @@
       try { return JSON.parse(storage.get(key('topics', activity.id)) || 'null'); } catch (err) { return null; }
     }
 
-    function renderTopicPicker(activity, options) {
+    function renderTopicPicker(activity, heading, options) {
       const needed = activity.chooseTopics;
       const chosen = new Set(savedTopics(activity) || []);
       const header = [
-        el('div', { class: 'eyebrow' }, 'Step 1 of 2 · Choose topics'),
-        el('h2', { class: 'q-title', dir: 'auto' }, activity.title),
+        el('div', { class: 'eyebrow' }, 'Choose ' + needed + ' topics'),
+        el('h2', { class: 'q-title', dir: 'auto' }, heading),
         activity.topicInstructions ? el('p', { class: 'explanation', dir: 'auto' }, activity.topicInstructions) : null,
       ];
       if (!options || !options.length) {
@@ -283,9 +290,41 @@
       }
     }
 
+    function myTopicsBox(activity, topics) {
+      return el('div', { class: 'my-topics' },
+        el('div', { class: 'small muted' }, 'Your topics'),
+        el('ul', {}, topics.map(t => el('li', { dir: 'auto' }, t))),
+        el('button', { class: 'link small', type: 'button', onclick: () => { changingTopics = true; render(); } }, 'Change topics'));
+    }
+
+    function partEyebrow(activity, part) {
+      if (!part) return el('div', { class: 'eyebrow' }, activity.name);
+      return el('div', { class: 'eyebrow' }, 'Part ' + (activity.parts.indexOf(part) + 1) + ' of ' + activity.parts.length);
+    }
+
     function renderSubmit(activity, s) {
+      const part = currentPart(activity, s);
+      const heading = activityHeading(activity, part);
+      let kind = submitKind(activity, part);
+
+      if (kind === 'text') {
+        const text = part.phoneText || part.text;
+        return show(partEyebrow(activity, part),
+          el('h2', { class: 'q-title', dir: 'auto' }, heading),
+          text ? el('p', { class: 'explanation lead-text', dir: 'auto' }, text) : null);
+      }
+
       const topics = activity.chooseTopics ? savedTopics(activity) : null;
-      if (activity.chooseTopics && (!topics || changingTopics)) return renderTopicPicker(activity, s.topicOptions);
+      if (kind === 'topics') {
+        if (!topics || changingTopics) return renderTopicPicker(activity, heading, s.topicOptions);
+        if (part) {
+          return show(partEyebrow(activity, part),
+            el('h2', { class: 'q-title', dir: 'auto' }, heading),
+            myTopicsBox(activity, topics),
+            el('p', { class: 'note ok' }, "Saved ✓ We'll form the groups from everyone's choices."));
+        }
+        kind = 'submit'; // no parts: go straight on to the link
+      }
 
       const previous = storage.get(key('link', activity.id));
       const group = activity.mode === 'group';
@@ -298,12 +337,9 @@
         el('button', { class: 'primary big', type: 'submit' }, previous ? 'Update link' : 'Save link'));
       form.addEventListener('submit', e => { e.preventDefault(); submitLink(activity, form); });
       show(
-        el('div', { class: 'eyebrow' }, activity.chooseTopics ? 'Step 2 of 2 · Submit' : group ? 'Group submission' : 'Personal submission'),
-        el('h2', { class: 'q-title', dir: 'auto' }, activity.title),
-        topics ? el('div', { class: 'my-topics' },
-          el('div', { class: 'small muted' }, 'Your topics'),
-          el('ul', {}, topics.map(t => el('li', { dir: 'auto' }, t))),
-          el('button', { class: 'link small', type: 'button', onclick: () => { changingTopics = true; render(); } }, 'Change topics')) : null,
+        partEyebrow(activity, part),
+        el('h2', { class: 'q-title', dir: 'auto' }, heading),
+        topics ? myTopicsBox(activity, topics) : null,
         activity.instructions ? el('p', { class: 'explanation', dir: 'auto' }, activity.instructions) : null,
         form,
         el('div', { class: 'note' + (previous ? ' ok' : '') }, previous ? LINK_SAVED_NOTE : ''));
@@ -321,6 +357,7 @@
     function render() {
       const s = state;
       const activity = s ? activityById(s.activity) : null;
+      const part = currentPart(activity, s);
       const inGame = !!activity && activity.type === 'game';
       setAccent(activity);
       if (pending && (!inGame || s.phase !== 'open' || s.round !== pending.round)) {
@@ -328,14 +365,14 @@
         pending = null;
       }
 
-      if (needsName(activity) && (!name || renaming)) {
+      if (needsName(activity, part) && (!name || renaming)) {
         document.body.classList.remove('is-welcome');
         return showJoin(activity);
       }
       $('join').hidden = true;
       $('main').hidden = false;
       $('me').textContent = name || '';
-      $('who').hidden = !needsName(activity);
+      $('who').hidden = !needsName(activity, part);
 
       document.body.classList.toggle('is-welcome', !activity);
       if (!activity) {
@@ -343,6 +380,15 @@
           el('img', { class: 'logo-lg', src: 'assets/logo.svg', alt: 'Reichart Group Retreat' }),
           el('h2', { class: 'q-title' }, WELCOME.title),
           WELCOME.subtitle ? el('p', { class: 'muted' }, WELCOME.subtitle) : null));
+      }
+
+      if (activity.type === 'agenda') {
+        return show(
+          el('div', { class: 'eyebrow' }, 'Today'),
+          el('h2', { class: 'q-title' }, 'Agenda'),
+          el('ol', { class: 'agenda' }, ACTIVITIES.map(a => el('li', { 'data-accent': a.accent || 'sage' },
+            el('div', { class: 'agenda-title', dir: 'auto' }, a.title),
+            el('div', { class: 'agenda-kind' }, a.name)))));
       }
 
       if (activity.type === 'lecture') {

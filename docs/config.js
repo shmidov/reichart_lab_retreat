@@ -5,7 +5,6 @@ window.APP_CONFIG = {
   // What everyone sees until the host starts an activity (placeholder; to be designed).
   WELCOME: {
     title: 'Welcome to the retreat',
-    subtitle: 'Placeholder welcome text',
   },
 
   // The parts of the day the host can switch between, in order.
@@ -15,19 +14,21 @@ window.APP_CONFIG = {
   //                   one row per person (resubmitting replaces that person's row).
   //                   mode 'personal' = everyone submits their own; 'group' = anyone may submit their group's.
   //                   chooseTopics: N = first pick N topics (the game's question titles), saved to `topicsSheet`.
+  //   parts: optional steps the host switches between (see the blogpost below); titles become "Title: label".
   //   accent: the activity's palette color ('sage', 'terracotta', 'sand' or 'slate').
+  // The host can also show the built-in Agenda page, which lists these activities.
   ACTIVITIES: [
     {
       id: 'review',
       type: 'lecture',
-      name: 'Lecture',
+      name: 'Lecture and discussion',
       title: 'The review process and its transformation',
       accent: 'sage',
     },
     {
       id: 'game',
       type: 'game',
-      name: 'Discussion game',
+      name: 'Game and discussion',
       title: 'Research identity, impact and publication in the AI era',
       accent: 'slate',
     },
@@ -38,9 +39,22 @@ window.APP_CONFIG = {
       name: 'Group writing',
       title: 'Position blogpost',
       chooseTopics: 3,
-      topicInstructions: 'Placeholder: choose the three topics you would most like to write about. We will form the groups from your choices.',
+      topicInstructions: 'Choose the three topics you would most like to write about. We will form the groups from your choices.',
       topicsSheet: 'Blogpost topics',
-      instructions: "Placeholder instructions: write your group's post in a Google Doc, set sharing to \"Anyone with the link\", and paste the link here. Anyone in the group can submit it.",
+      // The host switches between these parts. kind: 'topics' (pick topics), 'submit' (paste the link),
+      // 'text' (just show text: screenText on the projector, phoneText on phones, or `text` on both).
+      parts: [
+        { id: 'topics', kind: 'topics', label: 'Topic choice' },
+        { id: 'writing', kind: 'submit', label: 'Group writing' },
+        {
+          id: 'presentations',
+          kind: 'text',
+          label: 'Presentations',
+          screenText: 'Each group has 5 minutes to present and 5 minutes for questions',
+          phoneText: 'You have 5 minutes to present with your group and 5 minutes for questions',
+        },
+      ],
+      instructions: "Write your group's post in a Google Doc, set sharing to \"Anyone with the link\", and paste the link here. Anyone in the group can submit it.",
       sheet: 'Position blogpost',
       accent: 'terracotta',
     },
@@ -50,8 +64,17 @@ window.APP_CONFIG = {
       mode: 'personal',
       name: 'Personal writing',
       title: 'Future works',
-      instructions: 'Placeholder instructions: write your piece in a Google Doc, set sharing to "Anyone with the link", and paste the link here.',
+      instructions: 'Write your piece in a Google Doc, set sharing to "Anyone with the link", and paste the link here.',
       sheet: 'Future works',
+      parts: [
+        { id: 'writing', kind: 'submit', label: 'personal writing' },
+        {
+          id: 'presentations',
+          kind: 'text',
+          label: 'presentations',
+          text: 'You should present your research direction in 5 minutes, and explain how it is derived from your work or why do you find it interesting',
+        },
+      ],
       accent: 'sand',
     },
   ],

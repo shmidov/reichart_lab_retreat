@@ -137,7 +137,7 @@
       if (!state) return;
       const s = state;
       // Only rebuild the page when something visible changed (answers only update the counter).
-      const key = [s.epoch, s.activity, s.phase, s.round, s.index, s.total, s.results ? s.results.total : -1].join('|');
+      const key = [s.epoch, s.activity, s.part, s.phase, s.round, s.index, s.total, s.results ? s.results.total : -1].join('|');
       if (key !== renderedKey) {
         renderedKey = key;
         build(s);
@@ -171,11 +171,15 @@
       const activity = activityById(s.activity);
       document.body.classList.toggle('is-welcome', !activity);
       setAccent(activity);
-      $('corner-qr').hidden = !(activity && (activity.type === 'submit' || (activity.type === 'game' && s.phase === 'open')));
+      const part = currentPart(activity, s);
+      const needsPhones = activity && ((activity.type === 'submit' && submitKind(activity, part) !== 'text')
+        || (activity.type === 'game' && s.phase === 'open'));
+      $('corner-qr').hidden = !needsPhones;
 
       if (!activity) return buildWelcome();
+      if (activity.type === 'agenda') return buildAgenda();
       if (activity.type === 'lecture') return buildLecture(activity);
-      if (activity.type === 'submit') return buildSubmit(activity);
+      if (activity.type === 'submit') return buildSubmit(activity, part);
       return buildGame(s, activity);
     }
 
@@ -194,20 +198,40 @@
         el('p', { class: 's-question', dir: 'auto' }, activity.title));
     }
 
-    function buildSubmit(activity) {
+    function buildAgenda() {
       scene(
-        el('div', { class: 'eyebrow' }, activity.name),
-        el('p', { class: 's-question', dir: 'auto' }, activity.title),
-        activity.chooseTopics && activity.topicInstructions
-          ? el('p', { class: 'explanation writing-text', dir: 'auto' }, activity.topicInstructions)
-          : activity.instructions ? el('p', { class: 'explanation writing-text', dir: 'auto' }, activity.instructions) : null,
+        el('div', { class: 'eyebrow' }, 'Today'),
+        el('p', { class: 's-question' }, 'Agenda'),
+        el('ol', { class: 'agenda' }, (window.APP_CONFIG.ACTIVITIES || []).map(a => el('li', { 'data-accent': a.accent || 'sage' },
+          el('div', { class: 'agenda-title', dir: 'auto' }, a.title),
+          el('div', { class: 'agenda-kind' }, a.name)))));
+    }
+
+    function buildSubmit(activity, part) {
+      const kind = submitKind(activity, part);
+      const heading = activityHeading(activity, part);
+      const eyebrow = el('div', { class: 'eyebrow' },
+        part ? 'Part ' + (activity.parts.indexOf(part) + 1) + ' of ' + activity.parts.length : activity.name);
+
+      if (kind === 'text') {
+        const text = part.screenText || part.text;
+        return scene(eyebrow,
+          el('p', { class: 's-question', dir: 'auto' }, heading),
+          text ? el('p', { class: 'explanation writing-text', dir: 'auto' }, text) : null);
+      }
+
+      const topicsStep = kind === 'topics';
+      const text = topicsStep ? activity.topicInstructions : activity.instructions;
+      scene(eyebrow,
+        el('p', { class: 's-question', dir: 'auto' }, heading),
+        text ? el('p', { class: 'explanation writing-text', dir: 'auto' }, text) : null,
         el('div', { class: 'meters' },
-          activity.chooseTopics ? el('div', { class: 'meter' },
+          topicsStep || (!part && activity.chooseTopics) ? el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'topics' }),
             el('span', {}, 'chose their topics')) : null,
-          el('div', { class: 'meter' },
+          !topicsStep || !part ? el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'submitted' }),
-            el('span', { 'data-label': 'submitted' }))));
+            el('span', { 'data-label': 'submitted' })) : null));
     }
 
     function buildGame(s, activity) {

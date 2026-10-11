@@ -10,8 +10,11 @@ until the host picks one, phones and the projector show the welcome screen. The 
 |---|---|---|---|
 | 1 | The review process and its transformation | `lecture` | The title, on the projector and on phones. |
 | 2 | Research identity, impact and publication in the AI era | `game` | The opinion game (below). |
-| 3 | Position blogpost | `submit`, group, topics first | Everyone first picks 3 topics (the game's question titles); the host sees the choices and forms groups (outside the site); then anyone pastes their group's link (the same link from several people is fine). |
-| 4 | Future works | `submit`, personal | Everyone pastes the link to their own Google Doc. |
+| 3 | Position blogpost | `submit`, group, in parts | **Topic choice**: everyone picks 3 topics (the game's question titles); the host sees the choices and forms groups (outside the site). **Group writing**: anyone pastes their group's link (the same link from several people is fine). **Presentations**: presentation instructions. |
+| 4 | Future works | `submit`, personal, in parts | **Personal writing**: everyone pastes the link to their own Google Doc. **Presentations**: presentation instructions. |
+
+Before the activities, the host can also show an **Agenda** page listing activities 1–4. For activities with
+parts, the host picks the part under the activity buttons; titles read "Position blogpost: Topic choice".
 
 - **The projector screen (`screen.html`) runs the live site.** It keeps everything in memory (and in the
   laptop's browser storage, so a reload loses nothing).
@@ -24,8 +27,9 @@ until the host picks one, phones and the projector show the welcome screen. The 
   `Blogpost topics`, links to `Position blogpost` and `Future works`, one row per person (choosing or
   submitting again replaces it). The host page shows who chose which topics (and a per-topic tally to help
   form groups) and who has submitted; the projector shows the counts.
-- **People are identified by their name.** The game and the writing activities ask for a name once; every
-  name is recorded in the `Participants` tab. Entering a name that already exists (letter case doesn't
+- **People are identified by their name.** The game and the writing activities ask for a name once per
+  visit (prefilled with the last name used on that device; a reload keeps you signed in); every name that
+  is entered is recorded in the `Participants` tab. Entering a name that already exists (letter case doesn't
   matter) on any device continues as that person: their game answer, topics and links come back.
 - **Nobody is dropped during the day**, however long their phone sleeps; re-entering the same name after a
   disconnection simply continues. Names from an earlier session (not seen for 12+ hours, e.g. a rehearsal)

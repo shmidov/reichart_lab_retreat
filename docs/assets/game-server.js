@@ -30,7 +30,8 @@ class GameServer {
     try { saved = JSON.parse(storage.get(this.storageKey) || 'null'); } catch (err) { /* corrupt: start fresh */ }
     this.g = Object.assign({
       rev: 0,
-      activity: 'welcome', // 'welcome' or an id from APP_CONFIG.ACTIVITIES
+      activity: 'welcome', // 'welcome', 'agenda' or an id from APP_CONFIG.ACTIVITIES
+      parts: {}, // activity id -> current part id, for activities with parts
       phase: 'lobby',
       index: -1,
       round: 0,
@@ -174,6 +175,7 @@ class GameServer {
     if (Math.abs(Date.now() - (msg.t || 0)) > COMMAND_MAX_AGE_MS) return; // delayed/replayed
     switch (msg.cmd) {
       case 'activity': return this.setActivity(String(msg.activity));
+      case 'part': return this.setPart(String(msg.activity), String(msg.part));
       case 'open': return this.open(Number(msg.index));
       case 'close': return this.close();
       case 'lobby': return this.idle('lobby');
@@ -191,6 +193,15 @@ class GameServer {
     if (id !== 'welcome' && !activityById(id)) return;
     if (this.g.phase === 'open') this.close(true);
     this.g.activity = id;
+    this.publishNow();
+  }
+
+  /** Switches the part of an activity (e.g. the blogpost's topic choice / writing / presentations). */
+  setPart(activityId, partId) {
+    const activity = activityById(activityId);
+    if (!activity || !(activity.parts || []).some(p => p.id === partId)) return;
+    this.g.parts = this.g.parts || {};
+    this.g.parts[activityId] = partId;
     this.publishNow();
   }
 
@@ -287,6 +298,7 @@ class GameServer {
       epoch: g.epoch,
       rev: g.rev,
       activity: g.activity || 'welcome',
+      part: (g.parts || {})[g.activity] || null,
       phase: g.phase,
       index: g.index,
       total: g.questions.length,
