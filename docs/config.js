@@ -4,7 +4,7 @@ window.APP_CONFIG = {
 
   // What everyone sees until the host starts an activity (placeholder; to be designed).
   WELCOME: {
-    title: 'Welcome to the retreat',
+    title: 'Welcome to the retreat!',
   },
 
   // The parts of the day the host can switch between, in order.
@@ -50,8 +50,8 @@ window.APP_CONFIG = {
           id: 'presentations',
           kind: 'text',
           label: 'Presentations',
-          screenText: 'Each group has 5 minutes to present and 5 minutes for questions',
-          phoneText: 'You have 5 minutes to present with your group and 5 minutes for questions',
+          screenText: 'Each group has 5 minutes to present and 5 minutes for questions.',
+          phoneText: 'You have 5 minutes to present with your group and 5 minutes for questions.',
         },
       ],
       instructions: "Write your group's post in a Google Doc, set sharing to \"Anyone with the link\", and paste the link here. Anyone in the group can submit it.",
@@ -67,12 +67,12 @@ window.APP_CONFIG = {
       instructions: 'Write your piece in a Google Doc, set sharing to "Anyone with the link", and paste the link here.',
       sheet: 'Future works',
       parts: [
-        { id: 'writing', kind: 'submit', label: 'personal writing' },
+        { id: 'writing', kind: 'submit', label: 'Personal writing' },
         {
           id: 'presentations',
           kind: 'text',
-          label: 'presentations',
-          text: 'You should present your research direction in 5 minutes, and explain how it is derived from your work or why do you find it interesting',
+          label: 'Presentations',
+          text: 'You should present your research direction in 5 minutes, and explain how it is derived from your work or why you find it interesting.',
         },
       ],
       accent: 'sand',

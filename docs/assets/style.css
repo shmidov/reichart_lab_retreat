@@ -405,7 +405,7 @@ input[type=url]:focus { outline: none; border-color: var(--slate-soft); box-shad
 /* Lobby: the one deliberate slate "editorial moment". */
 .lobby { display: grid; grid-template-columns: 1.15fr auto; align-items: center; gap: 6vw; }
 .lobby h1 { font-size: 4em; line-height: 1.08; margin-bottom: .3em; }
-.lobby .lead { font-size: 1.2em; color: var(--ink-2); max-width: 28ch; }
+.lobby .lead, .stage .lead { font-size: 1.2em; color: var(--ink-2); max-width: 32ch; }
 .lobby-title { font-size: 3.2em !important; }
 .join-panel {
   background: var(--slate);

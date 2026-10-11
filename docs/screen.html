@@ -172,9 +172,8 @@
       document.body.classList.toggle('is-welcome', !activity);
       setAccent(activity);
       const part = currentPart(activity, s);
-      const needsPhones = activity && ((activity.type === 'submit' && submitKind(activity, part) !== 'text')
-        || (activity.type === 'game' && s.phase === 'open'));
-      $('corner-qr').hidden = !needsPhones;
+      // The large QR code is only on the welcome screen; every other page has the small one in the corner.
+      $('corner-qr').hidden = !activity;
 
       if (!activity) return buildWelcome();
       if (activity.type === 'agenda') return buildAgenda();
@@ -274,16 +273,14 @@
         return;
       }
 
-      // Lobby
-      scene(el('div', { class: 'lobby' },
-        el('div', {},
-          el('div', { class: 'eyebrow' }, activity.name),
-          el('h1', { class: 'lobby-title', dir: 'auto' }, activity.title),
-          el('p', { class: 'lead' }, 'Scan the code, enter your name, and wait for the first question.'),
-          el('div', { class: 'meter' },
-            el('span', { class: 'big', 'data-count': 'players' }),
-            el('span', {}, 'joined so far'))),
-        joinPanel('Scan to join')));
+      // Lobby (the small QR code in the corner is how latecomers join)
+      scene(
+        el('div', { class: 'eyebrow' }, activity.name),
+        el('h1', { class: 'lobby-title', dir: 'auto' }, activity.title),
+        el('p', { class: 'lead' }, 'Scan the code in the corner, enter your name, and wait for the first question.'),
+        el('div', { class: 'meter' },
+          el('span', { class: 'big', 'data-count': 'players' }),
+          el('span', {}, 'joined so far')));
     }
   </script>
 </body>
