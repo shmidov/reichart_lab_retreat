@@ -75,7 +75,7 @@ function currentPart(activity, state) {
   return activity.parts.find(p => p.id === (state && state.part)) || activity.parts[0];
 }
 
-/** "Position blogpost: Topic choice" for activities with parts, otherwise just the title. */
+/** "Position paper / Blogpost draft: Topic choice" for activities with parts, otherwise just the title. */
 function activityHeading(activity, part) {
   return part ? activity.title + ': ' + part.label : activity.title;
 }

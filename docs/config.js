@@ -21,7 +21,7 @@ window.APP_CONFIG = {
     {
       id: 'review',
       type: 'lecture',
-      name: 'Lecture and discussion',
+      name: 'Discussion by Roi',
       title: 'The review process and its transformation',
       accent: 'sage',
     },
@@ -37,10 +37,10 @@ window.APP_CONFIG = {
       type: 'submit',
       mode: 'group',
       name: 'Group writing',
-      title: 'Position blogpost',
+      title: 'Position paper / Blogpost draft',
       chooseTopics: 3,
       topicInstructions: 'Choose the three topics you would most like to write about. We will form the groups from your choices.',
-      topicsSheet: 'Blogpost topics',
+      topicsSheet: 'Position topics',
       // The host switches between these parts. kind: 'topics' (pick topics), 'submit' (paste the link),
       // 'text' (just show text: screenText on the projector, phoneText on phones, or `text` on both).
       parts: [

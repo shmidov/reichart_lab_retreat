@@ -10,11 +10,11 @@ until the host picks one, phones and the projector show the welcome screen. The 
 |---|---|---|---|
 | 1 | The review process and its transformation | `lecture` | The title, on the projector and on phones. |
 | 2 | Research identity, impact and publication in the AI era | `game` | The opinion game (below). |
-| 3 | Position blogpost | `submit`, group, in parts | **Topic choice**: everyone picks 3 topics (the game's question titles); the host sees the choices and forms groups (outside the site). **Group writing**: anyone pastes their group's link (the same link from several people is fine). **Presentations**: presentation instructions. |
+| 3 | Position paper / Blogpost draft | `submit`, group, in parts | **Topic choice**: everyone picks 3 topics (the game's question titles); the host sees the choices and forms groups (outside the site). **Group writing**: anyone pastes their group's link (the same link from several people is fine). **Presentations**: presentation instructions. |
 | 4 | Future works | `submit`, personal, in parts | **Personal writing**: everyone pastes the link to their own Google Doc. **Presentations**: presentation instructions. |
 
 Before the activities, the host can also show an **Agenda** page listing activities 1–4. For activities with
-parts, the host picks the part under the activity buttons; titles read "Position blogpost: Topic choice".
+parts, the host picks the part under the activity buttons; titles read "Position paper / Blogpost draft: Topic choice".
 
 - **The projector screen (`screen.html`) runs the live site.** It keeps everything in memory (and in the
   laptop's browser storage, so a reload loses nothing).
@@ -24,7 +24,7 @@ parts, the host picks the part under the activity buttons; titles read "Position
   or when the host clicks **Reload from Sheet**. After each question, the bar chart is shown immediately from
   memory, and the answers are saved to the Sheet in the background (the host page shows "Sheet: all saved ✓").
 - **Topics and links (activities 3 and 4) go straight from the phones to the Sheet**: topic choices to
-  `Blogpost topics`, links to `Position blogpost` and `Future works`, one row per person (choosing or
+  `Position topics`, links to `Position blogpost` and `Future works`, one row per person (choosing or
   submitting again replaces it). The host page shows who chose which topics (and a per-topic tally to help
   form groups) and who has submitted; the projector shows the counts.
 - **People are identified by their name.** The game and the writing activities ask for a name once per
@@ -51,7 +51,7 @@ Other settings in [`docs/config.js`](docs/config.js):
 3. In the toolbar, select the function **`setup`** and click **Run**. Allow the permissions:
    *Advanced → Go to … (unsafe)*. This step is safe because the script is your own.
    This creates the tabs `Questions` (with sample questions), `Responses` and `Summary` at the bottom of the Sheet.
-   The other tabs (`Participants`, `Blogpost topics`, `Position blogpost`, `Future works`) are created
+   The other tabs (`Participants`, `Position topics`, `Position blogpost`, `Future works`) are created
    automatically when first needed.
    The Execution log prints the Sheet's link.
 4. **Deploy → New deployment** → type **Web app**:
@@ -104,7 +104,7 @@ button to take over. Answers to a game question that is still open at that momen
 - `Summary`: one row per question: the number of answers, the average (for scales), and the counts and
   percentages for each answer.
 - `Participants`: every name that joined (first and last time).
-- `Blogpost topics`: one row per person (time, name, the chosen topics).
+- `Position topics`: one row per person (time, name, the chosen topics).
 - `Position blogpost`, `Future works`: one row per person (time, name, link).
 
 ## Local rehearsal

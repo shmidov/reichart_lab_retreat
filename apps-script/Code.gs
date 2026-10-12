@@ -18,7 +18,7 @@
  *   Responses  one row per person per question
  *   Summary    one row per question
  *   <activity> one tab per link activity (e.g. "Future works"): one row per person (name, link)
- *   <topics>   one tab per topic choice (e.g. "Blogpost topics"): one row per person (name, topics)
+ *   <topics>   one tab per topic choice (e.g. "Position topics"): one row per person (name, topics)
  */
 
 const QUESTIONS_SHEET = 'Questions';
