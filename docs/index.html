@@ -355,6 +355,7 @@
     // ---------- rendering ----------
 
     function show(...children) {
+      view.removeAttribute('dir'); // a Hebrew game question sets it to rtl
       setChildren(view, ...children);
       view.classList.remove('enter');
       void view.offsetWidth; // restart the entrance animation
@@ -412,12 +413,13 @@
       if (s.phase === 'results' && s.question) {
         const mine = storage.get(answerKey(s.round));
         show(
-          el('div', { class: 'counter' }, questionCounter(s)),
+          el('div', { class: 'counter', dir: 'ltr' }, questionCounter(s)),
           el('h2', { class: 'q-title', dir: 'auto' }, s.question.text),
-          el('div', { class: 'center', style: 'margin-top:26px' },
+          el('div', { class: 'center', dir: 'ltr', style: 'margin-top:26px' },
             el('div', { class: 'icon-badge' }, icon('chat')),
             el('p', {}, 'Responses are closed. The results are on the big screen.'),
             el('p', { class: 'muted' }, mine ? ['You answered: ', el('bdi', {}, mine)] : 'You did not answer this one.')));
+        view.dir = isRtl(s.question.text) ? 'rtl' : 'ltr';
         return;
       }
 
@@ -437,21 +439,22 @@
     function renderQuestion(s) {
       const q = s.question;
       const selected = storage.get(answerKey(s.round));
-      const layout = q.type === 'scale' ? 'scale' : (q.options.length === 2 ? 'two' : '');
+      const layout = q.type === 'scale' ? 'scale' : q.type === 'choice' ? 'lettered' : (q.options.length === 2 ? 'two' : '');
       show(
-        el('div', { class: 'counter' }, questionCounter(s)),
+        el('div', { class: 'counter', dir: 'ltr' }, questionCounter(s)),
         el('h2', { class: 'q-title', dir: 'auto' }, q.text),
         q.explanation ? el('p', { class: 'explanation', dir: 'auto' }, q.explanation) : null,
         el('div', { class: 'options ' + layout, role: 'group' },
-          q.options.map(opt => el('button', {
+          q.options.map((opt, i) => el('button', {
             type: 'button',
             class: 'option' + (opt === selected ? ' selected' : ''),
             'data-value': opt,
-            dir: 'auto',
             'aria-pressed': opt === selected ? 'true' : 'false',
+            'aria-label': q.type === 'choice' ? optionLetter(i) + '. ' + opt : null,
             onclick: () => choose(opt),
-          }, el('span', { class: 'tick' }, icon('check', 18)), opt))),
-        el('div', { class: 'note' + (selected ? ' ok' : '') }, selected ? SAVED_NOTE : 'Choose the answer closest to your view.'));
+          }, el('span', { class: 'tick' }, icon('check', 18)), optionBadge(q, i), el('span', { dir: 'auto' }, opt)))),
+        el('div', { class: 'note' + (selected ? ' ok' : ''), dir: 'auto' }, selected ? SAVED_NOTE : 'Choose the answer closest to your view.'));
+      view.dir = isRtl(q.text) ? 'rtl' : 'ltr';
     }
 
     // ---------- start ----------

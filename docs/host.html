@@ -299,7 +299,7 @@
         el('div', { class: 'q-meta' }, (TYPE_LABELS[q.type] || q.type) + ': ',
           q.type === 'scale'
             ? q.options[0] + '–' + q.options[q.options.length - 1]
-            : el('bdi', {}, q.options.join(' · '))),
+            : q.options.flatMap((o, i) => [i ? ' · ' : '', q.type === 'choice' ? optionLetter(i) + '. ' : '', el('bdi', {}, o)])),
         extra || null);
     }
 

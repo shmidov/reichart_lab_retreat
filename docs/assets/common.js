@@ -126,7 +126,24 @@ document.title = document.title ? GAME_TITLE + ' · ' + document.title : GAME_TI
 function optionsPreview(question) {
   const ltr = question.type === 'scale';
   return el('div', { class: 'choices' + (ltr ? ' ltr' : '') },
-    question.options.map(opt => el('span', { class: 'choice', dir: 'auto' }, opt)));
+    question.options.map((opt, i) => el('span', { class: 'choice' },
+      optionBadge(question, i), el('span', { dir: 'auto' }, opt))));
+}
+
+/** True if the text reads right-to-left (its first letter is Hebrew or Arabic). */
+function isRtl(text) {
+  const m = String(text || '').match(/[A-Za-z\u00C0-\u024F\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/);
+  return !!m && /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/.test(m[0]);
+}
+
+/** "A", "B", "C"… for the options of a choice question. */
+function optionLetter(i) {
+  return String.fromCharCode(65 + i);
+}
+
+/** The letter badge for a choice question's option (nothing for scales and yes/no). */
+function optionBadge(question, i) {
+  return question.type === 'choice' ? el('span', { class: 'opt-letter', 'aria-hidden': 'true' }, optionLetter(i)) : null;
 }
 
 // ---------- briefs (formatted instructions) ----------
@@ -183,7 +200,7 @@ function renderBars(container, results, question) {
   const max = Math.max(1, ...results.counts.map(c => c.count));
   const bars = [];
   const chart = el('div', { class: 'bars' + (question.type === 'scale' ? ' ltr' : '') },
-    results.counts.map(c => {
+    results.counts.map((c, i) => {
       const pct = results.total ? Math.round(c.count / results.total * 100) : 0;
       const bar = el('div', { class: 'bar' });
       bars.push([bar, c.count / max]);
@@ -192,7 +209,7 @@ function renderBars(container, results, question) {
           el('span', { class: 'bar-count' }, c.count),
           el('span', { class: 'bar-pct' }, pct + '%')),
         el('div', { class: 'bar-track' }, bar),
-        el('div', { class: 'bar-label', dir: 'auto' }, c.label));
+        el('div', { class: 'bar-label' }, optionBadge(question, i), el('span', { dir: 'auto' }, c.label)));
     }));
   container.replaceChildren(chart);
   // Force a layout at height 0, then set the real heights so they animate. (Not requestAnimationFrame:

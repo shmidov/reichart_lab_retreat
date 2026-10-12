@@ -368,7 +368,7 @@ body.screen::after { width: 40vh; height: 40vh; bottom: -14vh; right: 30vh; back
 .s-question.compact { font-size: 1.7em; max-width: none; }
 .stage .explanation { font-size: 1.12em; max-width: 56ch; }
 
-.stage .bars { height: 48vh; gap: 2vw; margin-top: 4vh; font-size: 1.05em; }
+.stage .bars { height: 44vh; gap: 2vw; margin-top: 4vh; font-size: 1.05em; }
 
 .meter { display: flex; align-items: baseline; flex-wrap: wrap; gap: .45em; margin-top: 5vh; color: var(--ink-2); }
 .meter .big { font-size: 2.6em; font-weight: 700; line-height: 1; color: var(--accent-ink); }
@@ -537,10 +537,41 @@ body.screen .agenda-title { font-size: 1.35em; }
   column-rule: 1px solid var(--line);
   margin-top: 2.2vh;
   max-width: none;
-  margin-right: 110px; /* keep the corner QR code clear */
 }
 .screen-brief .brief-h, .screen-brief li, .screen-brief p { break-inside: avoid; }
 .screen-brief .brief-h { break-after: avoid; }
 .meters.compact { margin-top: 1vh; }
 .meters.compact .meter { margin-top: 2vh; }
 @media (max-width: 900px) { .screen-brief { column-count: 1; } }
+
+/* ---------- right-to-left (Hebrew) questions ---------- */
+
+/* English bits inside a right-to-left question keep their own order but sit on the right. */
+.scene[dir=rtl] .meter[dir=ltr] { justify-content: flex-end; }
+.scene[dir=rtl] .choices.ltr { justify-content: flex-end; }
+#view[dir=rtl] .note { text-align: right; }
+
+/* ---------- lettered options (choice questions) ---------- */
+
+.opt-letter {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.75em;
+  height: 1.75em;
+  border-radius: 50%;
+  background: var(--accent-tint);
+  color: var(--accent-ink);
+  font-weight: 700;
+  font-size: .85em;
+  line-height: 1;
+}
+.options.lettered { grid-template-columns: 1fr; }
+.options.lettered .option { justify-content: flex-start; text-align: start; gap: 12px; padding: 14px 16px; }
+.options.lettered .option .tick { display: none !important; } /* the letter badge turns white instead */
+.option.selected .opt-letter { background: rgba(255, 255, 255, .22); color: #fff; }
+.choice .opt-letter { margin-inline-end: .5em; background: var(--surface); }
+.bar-label .opt-letter { margin: 0 auto .3em; display: grid; }
+
+/* The small corner QR code (bottom right) has its own strip, so content never runs under it. */
+body.has-corner-qr .stage { padding-right: max(6vw, calc(2.5vw + 150px)); }

@@ -155,6 +155,11 @@
       setChildren(body, el('div', { class: 'scene' }, children));
     }
 
+    /** A game question scene, laid out right-to-left when the question is in Hebrew. */
+    function questionScene(question, ...children) {
+      setChildren(body, el('div', { class: 'scene', dir: isRtl(question.text) ? 'rtl' : 'ltr' }, children));
+    }
+
     /** The site's QR code inside the slate join panel (welcome screen and game lobby). */
     function joinPanel(caption) {
       const qr = el('div', { class: 'qr-box' });
@@ -174,6 +179,7 @@
       const part = currentPart(activity, s);
       // The large QR code is only on the welcome screen; every other page has the small one in the corner.
       $('corner-qr').hidden = !activity;
+      document.body.classList.toggle('has-corner-qr', !!activity); // keeps content clear of it
 
       if (!activity) return buildWelcome();
       if (activity.type === 'agenda') return buildAgenda();
@@ -251,13 +257,13 @@
 
     function buildGame(s, activity) {
       if (s.phase === 'open' && s.question) {
-        scene(
-          el('div', { class: 'eyebrow' }, 'What do we think?'),
-          el('div', { class: 'counter' }, questionCounter(s)),
+        questionScene(s.question,
+          el('div', { class: 'eyebrow' }, el('span', { dir: 'ltr' }, 'What do we think?')),
+          el('div', { class: 'counter', dir: 'ltr' }, questionCounter(s)),
           el('p', { class: 's-question', dir: 'auto' }, s.question.text),
           s.question.explanation ? el('p', { class: 'explanation', dir: 'auto' }, s.question.explanation) : null,
           optionsPreview(s.question),
-          el('div', { class: 'meter' },
+          el('div', { class: 'meter', dir: 'ltr' },
             el('span', { class: 'big', 'data-count': 'answered' }),
             el('span', {}, 'of'),
             el('span', { 'data-count': 'players' }),
@@ -267,13 +273,13 @@
 
       if (s.phase === 'results' && s.question && s.results) {
         const chart = el('div');
-        scene(
-          el('div', { class: 'eyebrow' }, "Let's see what we think"),
-          el('div', { class: 'counter' }, questionCounter(s)),
+        questionScene(s.question,
+          el('div', { class: 'eyebrow' }, el('span', { dir: 'ltr' }, "Let's see what we think")),
+          el('div', { class: 'counter', dir: 'ltr' }, questionCounter(s)),
           el('p', { class: 's-question compact', dir: 'auto' }, s.question.text),
           s.question.explanation ? el('p', { class: 'explanation', dir: 'auto' }, s.question.explanation) : null,
           chart,
-          el('div', { class: 'meter small', style: 'margin-top:2.5vh' },
+          el('div', { class: 'meter small', dir: 'ltr', style: 'margin-top:2.5vh' },
             el('span', { class: 'big' }, s.results.total),
             el('span', {}, s.results.total === 1 ? 'response' : 'responses'),
             el('span', { class: 'discuss', style: 'margin:0 0 0 1.2em' }, 'What can we learn from this?')));
