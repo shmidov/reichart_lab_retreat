@@ -506,3 +506,41 @@ body.screen .agenda li::before { width: 2.2em; height: 2.2em; top: 2vh; }
 body.screen .agenda-title { font-size: 1.35em; }
 
 .lead-text { font-size: 1.1em; color: var(--ink); }
+
+/* ---------- briefs (formatted instructions) ---------- */
+
+.brief { color: var(--ink); line-height: 1.7; margin: 14px 0 6px; }
+.brief .brief-h {
+  font-size: 1.05em;
+  font-weight: 700;
+  color: var(--accent-ink);
+  margin: 1.1em 0 .35em;
+  padding-bottom: .2em;
+  border-bottom: 2px solid var(--accent-tint);
+}
+.brief > :first-child { margin-top: 0; }
+.brief p { margin: 0 0 .6em; }
+.brief ol, .brief ul { margin: .2em 0 .8em; padding-inline-start: 1.5em; }
+.brief li { margin: .3em 0; }
+.brief li::marker { color: var(--accent-ink); font-weight: 700; }
+.brief strong { color: var(--slate); font-weight: 700; }
+.brief a { color: var(--accent-ink); text-decoration: underline; text-decoration-color: var(--accent); overflow-wrap: break-word; }
+
+.jump { display: inline-block; margin: 0 0 6px; }
+.submit-form { margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); scroll-margin-top: 16px; }
+
+/* On the projector: two columns, sized down by fitBrief() if needed so it fits one screen. */
+.screen-brief {
+  font-size: 1em;
+  column-count: 2;
+  column-gap: 4vw;
+  column-rule: 1px solid var(--line);
+  margin-top: 2.2vh;
+  max-width: none;
+  margin-right: 110px; /* keep the corner QR code clear */
+}
+.screen-brief .brief-h, .screen-brief li, .screen-brief p { break-inside: avoid; }
+.screen-brief .brief-h { break-after: avoid; }
+.meters.compact { margin-top: 1vh; }
+.meters.compact .meter { margin-top: 2vh; }
+@media (max-width: 900px) { .screen-brief { column-count: 1; } }

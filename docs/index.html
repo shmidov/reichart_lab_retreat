@@ -328,7 +328,10 @@
 
       const previous = storage.get(key('link', activity.id));
       const group = activity.mode === 'group';
-      const form = el('form', { class: 'submit-form', novalidate: true },
+      const form = el('form', { class: 'submit-form', id: 'link-form', novalidate: true },
+        el('div', { class: 'eyebrow', style: 'margin:0' }, 'Your link'),
+        el('p', { class: 'small muted', style: 'margin:6px 0 0' },
+          'In Google Docs: Share → General access → "Anyone with the link", then copy the link and paste it here.'),
         el('label', {}, group ? "Link to your group's Google Doc" : 'Link to your Google Doc',
           el('input', {
             type: 'url', name: 'link', dir: 'ltr', inputmode: 'url', autocomplete: 'off',
@@ -339,8 +342,12 @@
       show(
         partEyebrow(activity, part),
         el('h2', { class: 'q-title', dir: 'auto' }, heading),
+        activity.instructions ? el('button', {
+          class: 'link small jump', type: 'button',
+          onclick: () => $('link-form').scrollIntoView({ behavior: 'smooth', block: 'start' }),
+        }, previous ? 'Update your link ↓' : 'Paste your link ↓') : null,
         topics ? myTopicsBox(activity, topics) : null,
-        activity.instructions ? el('p', { class: 'explanation', dir: 'auto' }, activity.instructions) : null,
+        activity.instructions ? renderBrief(activity.instructions) : null,
         form,
         el('div', { class: 'note' + (previous ? ' ok' : '') }, previous ? LINK_SAVED_NOTE : ''));
     }

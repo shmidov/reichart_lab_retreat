@@ -197,6 +197,19 @@
         el('p', { class: 's-question', dir: 'auto' }, activity.title));
     }
 
+    /** Shrinks a long brief step by step until the whole page fits on the screen. */
+    function fitBrief() {
+      const brief = body.querySelector('.screen-brief');
+      if (!brief) return;
+      let size = 1;
+      brief.style.fontSize = '';
+      while (document.documentElement.scrollHeight > window.innerHeight + 2 && size > 0.5) {
+        size -= 0.04;
+        brief.style.fontSize = size + 'em';
+      }
+    }
+    window.addEventListener('resize', fitBrief);
+
     function buildAgenda() {
       scene(
         el('div', { class: 'eyebrow' }, 'Today'),
@@ -222,15 +235,18 @@
       const topicsStep = kind === 'topics';
       const text = topicsStep ? activity.topicInstructions : activity.instructions;
       scene(eyebrow,
-        el('p', { class: 's-question', dir: 'auto' }, heading),
-        text ? el('p', { class: 'explanation writing-text', dir: 'auto' }, text) : null,
-        el('div', { class: 'meters' },
+        el('p', { class: 's-question compact', dir: 'auto' }, heading),
+        text ? renderBrief(text, topicsStep ? 'writing-text' : 'screen-brief') : null,
+        el('div', { class: 'meters compact' },
           topicsStep || (!part && activity.chooseTopics) ? el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'topics' }),
             el('span', {}, 'chose their topics')) : null,
           !topicsStep || !part ? el('div', { class: 'meter' },
             el('span', { class: 'big', 'data-count': 'submitted' }),
             el('span', { 'data-label': 'submitted' })) : null));
+      // After layout (and the web fonts), fit the brief to the screen.
+      requestAnimationFrame(fitBrief);
+      if (document.fonts) document.fonts.ready.then(fitBrief);
     }
 
     function buildGame(s, activity) {

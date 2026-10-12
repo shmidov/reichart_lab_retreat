@@ -129,6 +129,50 @@ function optionsPreview(question) {
     question.options.map(opt => el('span', { class: 'choice', dir: 'auto' }, opt)));
 }
 
+// ---------- briefs (formatted instructions) ----------
+
+/** **bold** and links inside a line, as DOM nodes (text is never parsed as HTML). */
+function briefInline(text) {
+  return text.split(/(\*\*[^*]+\*\*|https?:\/\/[^\s]+)/g).filter(Boolean).map(part => {
+    if (part.startsWith('**') && part.endsWith('**')) return el('strong', {}, part.slice(2, -2));
+    if (/^https?:\/\//.test(part)) {
+      // Show it without the protocol, and let long links wrap only after a "/".
+      const label = part.replace(/^https?:\/\/(www\.)?/, '').split('/');
+      return el('a', { href: part, target: '_blank', rel: 'noopener', dir: 'ltr' },
+        label.flatMap((piece, i) => (i ? ['/', el('wbr'), piece] : [piece])));
+    }
+    return part;
+  });
+}
+
+/**
+ * Renders instructions written in a tiny markup: "## " heading, "1. " numbered item, "* " bullet,
+ * **bold**, links; other lines are paragraphs. The text direction follows the text (Hebrew is RTL).
+ */
+function renderBrief(text, extraClass) {
+  const root = el('div', { class: 'brief' + (extraClass ? ' ' + extraClass : ''), dir: 'auto' });
+  let list = null;
+  String(text || '').split('\n').forEach(raw => {
+    const line = raw.trim();
+    let m;
+    if (!line) { list = null; return; }
+    if (line.startsWith('## ')) {
+      list = null;
+      root.append(el('h3', { class: 'brief-h' }, briefInline(line.slice(3))));
+    } else if ((m = line.match(/^\d+[.)]\s+(.*)$/))) {
+      if (!list || list.tagName !== 'OL') root.append(list = el('ol'));
+      list.append(el('li', {}, briefInline(m[1])));
+    } else if ((m = line.match(/^[*•-]\s+(.*)$/))) {
+      if (!list || list.tagName !== 'UL') root.append(list = el('ul'));
+      list.append(el('li', {}, briefInline(m[1])));
+    } else {
+      list = null;
+      root.append(el('p', {}, briefInline(line)));
+    }
+  });
+  return root;
+}
+
 // ---------- chart ----------
 
 /**
