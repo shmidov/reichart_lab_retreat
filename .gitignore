@@ -26,3 +26,6 @@ dist/
 
 # Office lock files
 ~$*
+
+# Working files kept locally only
+answer cards.pptx
