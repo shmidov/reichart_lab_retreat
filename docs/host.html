@@ -273,17 +273,18 @@
       const tally = new Map(questions().map(q => [q.text, []]));
       choices.forEach(c => c.topics.forEach(t => { if (!tally.has(t)) tally.set(t, []); tally.get(t).push(c.name); }));
       const byPopularity = [...tally.entries()].sort((a, b) => b[1].length - a[1].length);
+      const topicsDir = dirOfList([...tally.keys()]);
       return el('div', {},
         el('div', { class: 'eyebrow' }, 'Topic choices'),
         el('div', { class: 'q-meta' }, choices.length + (choices.length === 1 ? ' person has' : ' people have')
           + ' chosen ' + activity.chooseTopics + ' topics (also saved to the "' + activity.topicsSheet + '" tab).'),
-        choices.length ? el('div', { class: 'table-wrap' }, el('table', { class: 'data' },
+        choices.length ? el('div', { class: 'table-wrap' }, el('table', { class: 'data', dir: topicsDir },
           el('thead', {}, el('tr', {}, el('th', {}, 'Name'), el('th', {}, 'Topics'))),
           el('tbody', {}, choices.map(c => el('tr', {},
             el('td', { dir: 'auto' }, c.name),
             el('td', {}, c.topics.map(t => el('span', { class: 'chip topic', dir: 'auto' }, t)))))))) : null,
         choices.length ? el('div', { class: 'eyebrow', style: 'margin-top:18px' }, 'By topic') : null,
-        choices.length ? el('ul', { class: 'tally' }, byPopularity.map(([topic, people]) => el('li', {},
+        choices.length ? el('ul', { class: 'tally', dir: topicsDir }, byPopularity.map(([topic, people]) => el('li', {},
           el('span', { class: 'tally-count' }, people.length),
           el('div', {},
             el('div', { dir: 'auto' }, topic),
@@ -292,14 +293,16 @@
 
     // ---------- rendering ----------
 
+    /** A question with its options; laid out right-to-left when the question is in Hebrew. */
     function questionBlock(q, extra) {
-      return el('div', {},
-        el('div', { class: 'q-text', dir: 'auto' }, q.text),
-        q.explanation ? el('div', { class: 'explanation', dir: 'auto' }, q.explanation) : null,
-        el('div', { class: 'q-meta' }, (TYPE_LABELS[q.type] || q.type) + ': ',
-          q.type === 'scale'
-            ? q.options[0] + '–' + q.options[q.options.length - 1]
-            : q.options.flatMap((o, i) => [i ? ' · ' : '', q.type === 'choice' ? optionLetter(i) + '. ' : '', el('bdi', {}, o)])),
+      return el('div', { dir: dirOf(q.text) },
+        el('div', { class: 'q-text' }, q.text),
+        q.explanation ? el('div', { class: 'explanation' }, q.explanation) : null,
+        el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type),
+        q.type === 'scale'
+          ? el('div', { class: 'opt-list' }, el('span', { class: 'opt-chip', dir: 'ltr' }, q.options[0] + ' – ' + q.options[q.options.length - 1]))
+          : el('div', { class: 'opt-list' }, q.options.map((o, i) => el('span', { class: 'opt-chip' },
+            optionBadge(q, i), el('span', { dir: 'auto' }, o)))),
         extra || null);
     }
 
@@ -405,9 +408,9 @@
       }
       $('qlist').replaceChildren(...qs.map((q, i) => {
         const isCurrent = i === s.index && (s.phase === 'open' || s.phase === 'results');
-        return el('li', { class: isCurrent ? 'current' : '' },
+        return el('li', { class: isCurrent ? 'current' : '', dir: dirOf(q.text) },
           el('span', { class: 'qnum' }, i + 1),
-          el('div', { class: 'qbody' }, el('div', { dir: 'auto' }, q.text), el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
+          el('div', { class: 'qbody' }, el('div', {}, q.text), el('div', { class: 'q-meta' }, TYPE_LABELS[q.type] || q.type)),
           el('button', { type: 'button', onclick: () => openQuestion(i), disabled: busy || !alive }, 'Open'));
       }));
     }

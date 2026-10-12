@@ -136,6 +136,17 @@ function isRtl(text) {
   return !!m && /[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/.test(m[0]);
 }
 
+/** 'rtl' or 'ltr' for a text, for the dir attribute. */
+function dirOf(text) {
+  return isRtl(text) ? 'rtl' : 'ltr';
+}
+
+/** 'rtl' if most of the texts are right-to-left (e.g. a list of Hebrew topics). */
+function dirOfList(texts) {
+  const list = texts || [];
+  return list.filter(isRtl).length * 2 > list.length ? 'rtl' : 'ltr';
+}
+
 /** "A", "B", "C"… for the options of a choice question. */
 function optionLetter(i) {
   return String.fromCharCode(65 + i);

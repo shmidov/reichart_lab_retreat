@@ -553,25 +553,44 @@ body.screen .agenda-title { font-size: 1.35em; }
 
 /* ---------- lettered options (choice questions) ---------- */
 
+/* A solid slate badge, so each answer's letter is unmistakable (and matches the chart). */
 .opt-letter {
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 1.75em;
-  height: 1.75em;
+  width: 1.9em;
+  height: 1.9em;
   border-radius: 50%;
-  background: var(--accent-tint);
-  color: var(--accent-ink);
+  background: var(--slate);
+  color: #fff;
   font-weight: 700;
   font-size: .85em;
   line-height: 1;
 }
 .options.lettered { grid-template-columns: 1fr; }
-.options.lettered .option { justify-content: flex-start; text-align: start; gap: 12px; padding: 14px 16px; }
-.options.lettered .option .tick { display: none !important; } /* the letter badge turns white instead */
-.option.selected .opt-letter { background: rgba(255, 255, 255, .22); color: #fff; }
-.choice .opt-letter { margin-inline-end: .5em; background: var(--surface); }
-.bar-label .opt-letter { margin: 0 auto .3em; display: grid; }
+.options.lettered .option { justify-content: flex-start; text-align: start; gap: 14px; padding: 14px 16px; }
+.options.lettered .option .tick { display: none !important; } /* the letter badge inverts instead */
+.option.selected .opt-letter { background: #fff; color: var(--terracotta-ink); }
+.choice { gap: .55em; }
+.bar-label { display: flex; flex-direction: column; align-items: center; gap: .35em; }
+.bar-label .opt-letter { width: 2.1em; height: 2.1em; font-size: .9em; }
+
+/* Host page: a question's options as small lettered chips. */
+.opt-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.opt-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-block: 3px;
+  padding-inline: 4px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: .9em;
+  color: var(--ink);
+}
+.opt-chip:not(:has(.opt-letter)) { padding-inline: 12px; }
+.opt-chip .opt-letter { width: 1.7em; height: 1.7em; font-size: .8em; }
 
 /* The small corner QR code (bottom right) has its own strip, so content never runs under it. */
 body.has-corner-qr .stage { padding-right: max(6vw, calc(2.5vw + 150px)); }

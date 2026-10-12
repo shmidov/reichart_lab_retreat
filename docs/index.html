@@ -243,13 +243,13 @@
           b.disabled = !on && chosen.size >= needed;
         });
       };
-      const list = el('div', { class: 'options topics', role: 'group' }, options.map(topic => el('button', {
+      const list = el('div', { class: 'options topics', role: 'group', dir: dirOfList(options) }, options.map(topic => el('button', {
         type: 'button',
         class: 'option',
-        dir: 'auto',
+        dir: dirOf(topic),
         'data-value': topic,
         onclick: () => { chosen.has(topic) ? chosen.delete(topic) : chosen.add(topic); update(); },
-      }, el('span', { class: 'tick' }, icon('check', 18)), topic)));
+      }, el('span', { class: 'tick' }, icon('check', 18)), el('span', {}, topic))));
       save.addEventListener('click', async () => {
         const topics = options.filter(t => chosen.has(t)); // keep the list order
         save.disabled = true;
@@ -293,7 +293,7 @@
     function myTopicsBox(activity, topics) {
       return el('div', { class: 'my-topics' },
         el('div', { class: 'small muted' }, 'Your topics'),
-        el('ul', {}, topics.map(t => el('li', { dir: 'auto' }, t))),
+        el('ul', { dir: dirOfList(topics) }, topics.map(t => el('li', { dir: 'auto' }, t))),
         el('button', { class: 'link small', type: 'button', onclick: () => { changingTopics = true; render(); } }, 'Change topics'));
     }
 
@@ -412,13 +412,15 @@
 
       if (s.phase === 'results' && s.question) {
         const mine = storage.get(answerKey(s.round));
+        const mineIndex = s.question.options.indexOf(mine);
+        const mineLabel = s.question.type === 'choice' && mineIndex >= 0 ? optionLetter(mineIndex) + '. ' : '';
         show(
           el('div', { class: 'counter', dir: 'ltr' }, questionCounter(s)),
           el('h2', { class: 'q-title', dir: 'auto' }, s.question.text),
           el('div', { class: 'center', dir: 'ltr', style: 'margin-top:26px' },
             el('div', { class: 'icon-badge' }, icon('chat')),
             el('p', {}, 'Responses are closed. The results are on the big screen.'),
-            el('p', { class: 'muted' }, mine ? ['You answered: ', el('bdi', {}, mine)] : 'You did not answer this one.')));
+            el('p', { class: 'muted' }, mine ? ['You answered: ', mineLabel, el('bdi', {}, mine)] : 'You did not answer this one.')));
         view.dir = isRtl(s.question.text) ? 'rtl' : 'ltr';
         return;
       }
