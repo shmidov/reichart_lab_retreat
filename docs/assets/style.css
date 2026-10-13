@@ -471,10 +471,9 @@ table.data td:first-child { font-weight: 600; color: var(--slate); white-space: 
 
 /* ---------- agenda ---------- */
 
-.agenda { list-style: none; counter-reset: agenda; margin: 16px 0 0; padding: 0; }
+.agenda { list-style: none; margin: 16px 0 0; padding: 0; }
 .agenda li {
   --dot: var(--sage);
-  counter-increment: agenda;
   position: relative;
   padding: 14px 0 14px 56px;
   border-top: 1px solid var(--line);
@@ -484,7 +483,7 @@ table.data td:first-child { font-weight: 600; color: var(--slate); white-space: 
 .agenda li[data-accent=sand] { --dot: var(--sand); }
 .agenda li[data-accent=slate] { --dot: var(--slate-soft); }
 .agenda li::before {
-  content: counter(agenda);
+  content: attr(data-num);
   position: absolute;
   left: 0;
   top: 12px;
@@ -498,12 +497,18 @@ table.data td:first-child { font-weight: 600; color: var(--slate); white-space: 
   font-weight: 700;
 }
 .agenda li[data-accent=sand]::before { color: var(--slate); }
+/* Meals and breaks: no number, an empty circle in one neutral color. */
+.agenda li.agenda-break::before { content: ''; background: transparent; border: 2.5px solid var(--line-2); box-sizing: border-box; }
+.agenda li.agenda-break .agenda-title { font-weight: 500; color: var(--ink-2); }
+.agenda li.agenda-break { display: flex; align-items: center; min-height: 3.6em; }
+body.screen .agenda li.agenda-break { min-height: 0; }
 .agenda-title { font-weight: 600; color: var(--slate); font-size: 1.08em; line-height: 1.35; }
 .agenda-kind { color: var(--muted); font-size: .9em; margin-top: 2px; }
-body.screen .agenda { margin-top: 3vh; max-width: 46em; }
-body.screen .agenda li { padding: 2.2vh 0 2.2vh 3.4em; }
-body.screen .agenda li::before { width: 2.2em; height: 2.2em; top: 2vh; }
-body.screen .agenda-title { font-size: 1.35em; }
+body.screen .agenda { margin-top: 1.5vh; max-width: 46em; }
+body.screen .agenda li { padding: 1.3vh 0 1.3vh 3.2em; }
+body.screen .agenda li::before { width: 2em; height: 2em; top: 50%; transform: translateY(-50%); }
+body.screen .agenda-title { font-size: 1.25em; }
+body.screen .agenda-kind { font-size: .82em; }
 
 .lead-text { font-size: 1.1em; color: var(--ink); }
 

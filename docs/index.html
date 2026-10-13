@@ -424,9 +424,7 @@
         return show(
           el('div', { class: 'eyebrow' }, 'Today'),
           el('h2', { class: 'q-title' }, 'Agenda'),
-          el('ol', { class: 'agenda' }, ACTIVITIES.map(a => el('li', { 'data-accent': a.accent || 'sage' },
-            el('div', { class: 'agenda-title', dir: 'auto' }, a.title),
-            el('div', { class: 'agenda-kind' }, a.name)))));
+          renderAgendaList());
       }
 
       if (activity.type === 'lecture') {

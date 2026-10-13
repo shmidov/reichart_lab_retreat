@@ -238,7 +238,7 @@
           'Everyone sees the welcome screen: ' + WELCOME.title));
       } else if (activity.type === 'agenda') {
         info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
-          'Everyone sees the agenda: the titles of activities 1–' + (window.APP_CONFIG.ACTIVITIES || []).length + '.'));
+          'Everyone sees the agenda: activities 1–' + (window.APP_CONFIG.ACTIVITIES || []).length + ' with the meals in between (AGENDA in config.js).'));
       } else if (activity.type === 'lecture') {
         info.replaceChildren(el('p', { class: 'muted small', style: 'margin:14px 0 0' },
           'The title is shown on the screen and on phones.'));

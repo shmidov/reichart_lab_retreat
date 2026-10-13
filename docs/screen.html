@@ -203,15 +203,15 @@
         el('p', { class: 's-question', dir: 'auto' }, activity.title));
     }
 
-    /** Shrinks a long brief step by step until the whole page fits on the screen. */
+    /** Shrinks a long brief (or a long agenda) step by step until the whole page fits on the screen. */
     function fitBrief() {
-      const brief = body.querySelector('.screen-brief');
-      if (!brief) return;
+      const target = body.querySelector('.screen-brief, .agenda');
+      if (!target) return;
       let size = 1;
-      brief.style.fontSize = '';
+      target.style.fontSize = '';
       while (document.documentElement.scrollHeight > window.innerHeight + 2 && size > 0.5) {
         size -= 0.04;
-        brief.style.fontSize = size + 'em';
+        target.style.fontSize = size + 'em';
       }
     }
     window.addEventListener('resize', fitBrief);
@@ -220,9 +220,9 @@
       scene(
         el('div', { class: 'eyebrow' }, 'Today'),
         el('p', { class: 's-question' }, 'Agenda'),
-        el('ol', { class: 'agenda' }, (window.APP_CONFIG.ACTIVITIES || []).map(a => el('li', { 'data-accent': a.accent || 'sage' },
-          el('div', { class: 'agenda-title', dir: 'auto' }, a.title),
-          el('div', { class: 'agenda-kind' }, a.name)))));
+        renderAgendaList());
+      requestAnimationFrame(fitBrief);
+      if (document.fonts) document.fonts.ready.then(fitBrief);
     }
 
     function buildSubmit(activity, part) {

@@ -40,6 +40,8 @@ Switching away from the game in the middle of a question closes that question an
 Other settings in [`docs/config.js`](docs/config.js):
 - `WELCOME`: the welcome screen's texts (placeholders).
 - Each activity's `accent`: its palette color (`sage`, `terracotta`, `sand`, `slate`).
+- `AGENDA`: the Agenda page, in order. An activity id (e.g. `'game'`) shows that activity numbered, with
+  its title; any other text (e.g. `'Lunch'`) is shown as a meal or break, with an empty circle and no number.
 - Each writing activity's `instructions`: the brief shown on the projector and on phones during the writing
   part. Write it as plain text with a little formatting: `## ` starts a heading, `1. ` a numbered item,
   `* ` a bullet, `**…**` is bold, and links become clickable. Hebrew text is laid out right-to-left. On the

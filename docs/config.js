@@ -125,6 +125,18 @@ window.APP_CONFIG = {
     },
   ],
 
+  // The Agenda page, in order: an activity id from ACTIVITIES (shown numbered, with its title), or any other
+  // text, e.g. a meal (shown without a number, with an empty neutral circle).
+  AGENDA: [
+    'Welcome & Refreshments',
+    'review',
+    'game',
+    'Lunch',
+    'blogpost',
+    'future',
+    'Vivino',
+  ],
+
   // Apps Script web-app URL (ends with /exec). See SETUP.md.
   API_URL: 'https://script.google.com/macros/s/AKfycbwbvGGEVrz3mSHzmiGxzTtpbA-H6bgYyh02rPnci9slc4SHDqDPvdwrkwC4dC9ma-o3/exec',
 

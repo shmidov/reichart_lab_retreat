@@ -69,6 +69,27 @@ function activityById(id) {
   return ((window.APP_CONFIG || {}).ACTIVITIES || []).find(a => a.id === id) || null;
 }
 
+/**
+ * The Agenda list (projector and phones): activities numbered 1, 2… in their colors, and other
+ * entries (meals, breaks) with an empty neutral circle and no number.
+ */
+function renderAgendaList() {
+  const config = window.APP_CONFIG || {};
+  const activities = config.ACTIVITIES || [];
+  const entries = config.AGENDA || activities.map(a => a.id);
+  let number = 0;
+  return el('ol', { class: 'agenda' }, entries.map(entry => {
+    const activity = activities.find(a => a.id === entry);
+    if (!activity) {
+      return el('li', { class: 'agenda-break' }, el('div', { class: 'agenda-title', dir: 'auto' }, entry));
+    }
+    number++;
+    return el('li', { 'data-accent': activity.accent || 'sage', 'data-num': number },
+      el('div', { class: 'agenda-title', dir: 'auto' }, activity.title),
+      el('div', { class: 'agenda-kind' }, activity.name));
+  }));
+}
+
 /** The activity's current part (from the live state), or null if it has no parts. */
 function currentPart(activity, state) {
   if (!activity || !activity.parts || !activity.parts.length) return null;
