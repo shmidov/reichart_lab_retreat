@@ -128,14 +128,12 @@
       $('name-input').focus();
     }
 
-    $('join-form').addEventListener('submit', async e => {
-      e.preventDefault();
-      const typed = cleanText($('name-input').value);
+    /** Signs in with a typed name (from the welcome screen or the name screen before an activity). */
+    async function submitName(typed, button, status) {
       if (!typed) return;
-      const button = $('join-form').querySelector('button');
       button.disabled = true;
-      $('join-status').className = 'note';
-      $('join-status').textContent = 'One moment…';
+      status.className = 'note';
+      status.textContent = 'One moment…';
       try {
         await registerName(typed);
       } catch (err) {
@@ -145,7 +143,43 @@
       }
       renaming = false;
       render();
+    }
+
+    $('join-form').addEventListener('submit', e => {
+      e.preventDefault();
+      submitName(cleanText($('name-input').value), $('join-form').querySelector('button'), $('join-status'));
     });
+
+    /** The welcome card: the logo and title, and the name form until the person has signed in. */
+    function renderWelcome() {
+      const signedIn = name && !renaming;
+      const parts = [
+        el('img', { class: 'logo-lg', src: 'assets/logo.svg', alt: 'Reichart Group Retreat' }),
+        el('h2', { class: 'q-title' }, WELCOME.title),
+        WELCOME.subtitle ? el('p', { class: 'muted' }, WELCOME.subtitle) : null,
+      ];
+      if (signedIn) {
+        return show(el('div', { class: 'center' }, parts,
+          el('p', { class: 'welcome-hi' }, 'Hi ', el('bdi', {}, name), '! You\'re all set.'),
+          el('p', { class: 'muted small' }, 'The first activity will appear here.')));
+      }
+      const input = el('input', {
+        type: 'text', dir: 'auto', maxlength: 40, autocomplete: 'name', required: true,
+        value: renaming ? '' : storage.get('lastName') || '',
+      });
+      const status = el('p', { class: 'note' });
+      const form = el('form', { class: 'welcome-form' },
+        el('label', {}, "What's your name?", input),
+        el('p', { class: 'muted small', style: 'margin:8px 0 0' },
+          'Just a name, no password. Use the same name all day; if you come back later, it picks up where you left off.'),
+        el('button', { class: 'primary big', type: 'submit' }, 'Continue'),
+        status);
+      form.addEventListener('submit', e => {
+        e.preventDefault();
+        submitName(cleanText(input.value), form.querySelector('button'), status);
+      });
+      show(el('div', { class: 'center' }, parts), form);
+    }
 
     $('rename').addEventListener('click', () => { renaming = true; render(); });
 
@@ -380,15 +414,11 @@
       $('join').hidden = true;
       $('main').hidden = false;
       $('me').textContent = name || '';
-      $('who').hidden = !needsName(activity, part);
+      // "Signed in as … · Not you?" wherever a name is in use (including the welcome screen).
+      $('who').hidden = !(name && !renaming && (needsName(activity, part) || !activity));
 
       document.body.classList.toggle('is-welcome', !activity);
-      if (!activity) {
-        return show(el('div', { class: 'center' },
-          el('img', { class: 'logo-lg', src: 'assets/logo.svg', alt: 'Reichart Group Retreat' }),
-          el('h2', { class: 'q-title' }, WELCOME.title),
-          WELCOME.subtitle ? el('p', { class: 'muted' }, WELCOME.subtitle) : null));
-      }
+      if (!activity) return renderWelcome();
 
       if (activity.type === 'agenda') {
         return show(

@@ -27,9 +27,10 @@ parts, the host picks the part under the activity buttons; titles read "Position
   `Position topics`, links to `Position blogpost` and `Future works`, one row per person (choosing or
   submitting again replaces it). The host page shows who chose which topics (and a per-topic tally to help
   form groups) and who has submitted; the projector shows the counts.
-- **People are identified by their name.** The game and the writing activities ask for a name once per
-  visit (prefilled with the last name used on that device; a reload keeps you signed in); every name that
-  is entered is recorded in the `Participants` tab. Entering a name that already exists (letter case doesn't
+- **People are identified by their name.** The welcome screen asks for it right away (prefilled with the
+  last name used on that device; a reload keeps you signed in), so the activities don't need to. Anyone
+  who skipped it is asked when an activity needs a name. Every name entered is recorded in the
+  `Participants` tab. Entering a name that already exists (letter case doesn't
   matter) on any device continues as that person: their game answer, topics and links come back.
 - **Nobody is dropped during the day**, however long their phone sleeps; re-entering the same name after a
   disconnection simply continues. Names from an earlier session (not seen for 12+ hours, e.g. a rehearsal)

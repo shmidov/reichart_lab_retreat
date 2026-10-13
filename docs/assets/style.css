@@ -594,3 +594,8 @@ body.screen .agenda-title { font-size: 1.35em; }
 
 /* The small corner QR code (bottom right) has its own strip, so content never runs under it. */
 body.has-corner-qr .stage { padding-right: max(6vw, calc(2.5vw + 150px)); }
+
+/* Welcome screen: the name form under the logo, and the greeting once signed in. */
+.welcome-form { margin-top: 22px; padding-top: 20px; border-top: 1px solid var(--line); text-align: start; }
+.welcome-form label { font-size: 1.05em; }
+.welcome-hi { font-size: 1.15em; font-weight: 600; color: var(--accent-ink); margin: 14px 0 4px; }
