@@ -85,7 +85,15 @@
     renderQr($('corner-qr-code'), joinUrl, 110);
 
     (async function start() {
-      await relay.whenConnected(15000);
+      if (!(await relay.whenConnected(15000))) {
+        // Say so on the big screen instead of spinning forever, and keep trying.
+        scene(el('div', { class: 'center' },
+          el('div', { class: 'breath' }),
+          el('h1', {}, 'Connecting…'),
+          el('p', { class: 'lead', style: 'margin-inline:auto' },
+            "This computer can't reach the live relays yet. It keeps trying; if this stays, the network is probably blocking them: try another Wi-Fi network or a phone hotspot.")));
+        while (!relay.connectedCount) await new Promise(r => setTimeout(r, 1000));
+      }
       await new Promise(r => setTimeout(r, 2500)); // collect retained heartbeat/state
       const otherAlive = heartbeat && heartbeat.serverId !== serverId && Date.now() - heartbeat.t < SERVER_ALIVE_MS + 5000;
       if (otherAlive) becomeViewer();

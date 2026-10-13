@@ -10,8 +10,9 @@ class Relay {
     this.handlers = new Map(); // topic suffix -> handler
     this.seen = new Map(); // message id -> receive time
     this.onStatus = onStatus || (() => {});
-    this.urls = config.BROKERS || [];
-    this.clients = this.urls.map(url => this.createClient(url));
+    // Each broker is a URL, or {url, username, password} for brokers that need (public) credentials.
+    this.brokers = (config.BROKERS || []).map(b => (typeof b === 'string' ? { url: b } : b));
+    this.clients = this.brokers.map(b => this.createClient(b));
 
     // mqtt.js can get stuck mid-reconnect (e.g. after the laptop sleeps or the tab was in the background).
     // Any connection that has been down for a while is replaced with a brand-new one.
@@ -21,8 +22,10 @@ class Relay {
     window.addEventListener('online', check);
   }
 
-  createClient(url) {
-    const client = mqtt.connect(url, {
+  createClient(broker) {
+    const client = mqtt.connect(broker.url, {
+      username: broker.username,
+      password: broker.password,
       clientId: 'rlr-' + randomId(),
       clean: true,
       keepalive: 30,
@@ -49,7 +52,7 @@ class Relay {
     this.clients.forEach((client, i) => {
       if (client.connected || !client.downSince || Date.now() - client.downSince < 15000) return;
       try { client.end(true); } catch (err) { /* already broken */ }
-      this.clients[i] = this.createClient(this.urls[i]);
+      this.clients[i] = this.createClient(this.brokers[i]);
     });
   }
 

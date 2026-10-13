@@ -147,9 +147,12 @@ window.APP_CONFIG = {
   // Only separates the host from the players; it is not real security.
   HOST_PASSWORD: 'reichart',
 
-  // Public MQTT relays. Every message goes through all of them, so one being down doesn't matter.
+  // Public MQTT relays. Every message goes through all of them, so the site works as long as any one is
+  // reachable. shiftr.io runs on port 443 (like normal websites), so it also gets through networks that
+  // block the other relays' ports (common on university and company networks).
   BROKERS: [
     'wss://broker.hivemq.com:8884/mqtt',
     'wss://broker.emqx.io:8084/mqtt',
+    { url: 'wss://public.cloud.shiftr.io:443', username: 'public', password: 'public' },
   ],
 };

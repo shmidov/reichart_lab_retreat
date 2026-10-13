@@ -5,6 +5,7 @@
 //
 //   node dev/mock-server.js            -> http://localhost:8080  (host password: "host")
 //   PORT=9000 API_DELAY_MS=0 node dev/mock-server.js
+//   BLOCKED_NETWORK=1 node dev/mock-server.js   (only the port-443 relays, like a network that blocks the rest)
 //
 // GET /mock/sheets shows the fake spreadsheet contents.
 
@@ -106,7 +107,10 @@ http.createServer((req, res) => {
   if (url.pathname === '/config.js') {
     const real = fs.readFileSync(path.join(SITE, 'config.js'), 'utf8');
     const override = { API_URL: '/api', GAME_ID, HOST_PASSWORD };
-    return send(res, 200, TYPES['.js'], real + `\nObject.assign(window.APP_CONFIG, ${JSON.stringify(override)});\n`);
+    const blocked = process.env.BLOCKED_NETWORK
+      ? '\nwindow.APP_CONFIG.BROKERS = window.APP_CONFIG.BROKERS.filter(b => /:443\\b/.test(typeof b === "string" ? b : b.url));\n'
+      : '';
+    return send(res, 200, TYPES['.js'], real + `\nObject.assign(window.APP_CONFIG, ${JSON.stringify(override)});\n` + blocked);
   }
 
   if (url.pathname === '/mock/sheets') {

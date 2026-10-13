@@ -18,8 +18,12 @@ parts, the host picks the part under the activity buttons; titles read "Position
 
 - **The projector screen (`screen.html`) runs the live site.** It keeps everything in memory (and in the
   laptop's browser storage, so a reload loses nothing).
-- **Phones and the host page talk to it through public relays** (free MQTT brokers: HiveMQ and EMQX).
-  Every message goes through both relays, so the site keeps working if one is down. Updates take about 0.1–0.3 s.
+- **Phones and the host page talk to it through public relays** (free MQTT brokers: HiveMQ, EMQX and
+  shiftr.io). Every message goes through all of them, so the site keeps working as long as any one is
+  reachable. Updates take about 0.1–0.3 s (up to about 1.5 s when only shiftr.io gets through).
+  HiveMQ and EMQX use ports 8884/8084, which some university and company networks block; shiftr.io uses
+  port 443 like normal websites, so it gets through those networks. If the projector can't reach any
+  relay, it says so on screen and keeps trying; switching to another Wi-Fi network or a phone hotspot helps.
 - **The game uses the Google Sheet only between questions.** The screen loads the questions when it starts,
   or when the host clicks **Reload from Sheet**. After each question, the bar chart is shown immediately from
   memory, and the answers are saved to the Sheet in the background (the host page shows "Sheet: all saved ✓").
@@ -121,6 +125,8 @@ node dev/mock-server.js
 ```
 
 Then open http://localhost:8080/screen.html, `/host.html` (password `host`) and `/` (players).
+To rehearse as if on a network that blocks the relays' unusual ports, start it with `BLOCKED_NETWORK=1`
+(only the port-443 relay is used).
 The Sheet is faked in memory: open `/mock/sheets` to see what would be saved. The live messages still go
 through the real relays, under a random game id.
 
